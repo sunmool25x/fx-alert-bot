@@ -1,5 +1,6 @@
 import { WalletFlowError } from "./connection.js";
 import { assertOkxLink } from "./okx-protocol.js";
+import { walletRedirect } from "./wallet-trust.js";
 
 // Reown WalletGuide entries inspected 2026-09-17. See WALLET_ROUTING.md.
 // These are app links, never RPC endpoints or fallback wallets.
@@ -20,7 +21,7 @@ export function telegramEnvironment(platform?:string):TelegramEnvironment {
 export const telegramReturn="tg://resolve?domain=world_fx_alert_bot";
 export function returnMetadata(environment:TelegramEnvironment) {
   // A phone scanning a desktop QR must not be redirected into a different Telegram session.
-  return environment==="desktop"?{}:{redirect:{native:telegramReturn}};
+  const native=walletRedirect(environment,"reown");return native?{redirect:{native}}:{};
 }
 export function pairingTopic(uri:string) {
   const match=/^wc:([a-f0-9]{64})@2\?(.+)$/i.exec(uri);

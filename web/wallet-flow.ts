@@ -30,7 +30,8 @@ export class WalletFlow {
   }
   async select(choice:WalletChoice){
     if(this.screen.step!=="selecting"||this.screen.busy)return;
-    this.retire();const generation=this.generation,connection=this.options.create(choice);this.current=connection;
+    this.retire();const generation=this.generation;let connection:WalletConnection;
+    try{connection=this.options.create(choice);}catch(e){await this.fail(e);return;}this.current=connection;
     const current=()=>generation===this.generation&&this.current===connection;
     this.options.pending(true);this.show({step:"preparing",choice});
     try{
@@ -75,6 +76,12 @@ export class WalletFlow {
     }catch(e){if(current())await this.fail(e);}
   }
   lost(){const visible=this.screen.step!=="closed";this.retire();this.show(visible?{step:"error",code:"CONNECTION_LOST"}:{step:"closed"});}
+  requestHandoff(){
+    if(!this.current||!this.provider||this.current.choice!=="okx")throw new WalletFlowError("WALLET_REQUIRED");
+    this.current.assert();
+    if(this.current.environment!=="desktop")this.options.open(this.current,this.current.handoffUri);
+  }
+  claimReady(){return this.current?.choice==="okx"&&this.provider?.claimSupported===true;}
   private async fail(error:unknown,code?:string){
     const choice=this.screen.choice;this.retire();const generation=this.generation;
     const reason=code??(error instanceof WalletFlowError?error.code:"UNAVAILABLE");

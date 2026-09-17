@@ -3,5 +3,5 @@
   "name": "fx-alert-bot",
   "visibility": "public",
   "description": "Korean-first FX monitoring, alerts and Telegram trading interface powered by Sera Protocol.",
-  "topics": ["built-on-sera", "telegram-bot", "stablecoin", "fx", "web3", "typescript", "sera"]
+  "topics": ["built-on-sera", "telegram-bot", "stablecoin", "fx", "web3", "typescript", "sera", "sera-protocol", "sepolia"]
 }

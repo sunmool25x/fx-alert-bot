@@ -4,6 +4,7 @@ import type { TradeRow } from "../database/wallet.js";
 import { walletText,stateText,walletFailure } from "../i18n/wallet.js";
 import { fromRawUnits } from "../sera/precision.js";
 import type { Snapshot } from "./service.js";
+import { authorizationReview } from "./review.js";
 function terms(p:Snapshot,wallet:string,language:Language) {
   const m=walletText[language],q=p.quote,r=q.route_params;
   return ["USDC → XSGD",m.wallet+": "+wallet,m.recipient+": "+r.recipient,
@@ -17,7 +18,7 @@ function terms(p:Snapshot,wallet:string,language:Language) {
 export function previewView(p:Snapshot,language:Language) {
   const m=walletText[language];
   return {id:"",state:"PREVIEW",version:null,expiresAt:p.quote.expires_at*1000-5000,
-    text:[m.network,m.preview,...terms(p,p.quote.route_params.taker,language),m.infrastructure,m.attribution].join("\n\n")};
+    text:[m.network,m.preview,...terms(p,p.quote.route_params.taker,language),m.infrastructure,m.attribution].join("\n\n"),details:authorizationReview(p,language)};
 }
 export function tradeView(row:TradeRow,language:Language) {
   const m=walletText[language],lines=[m.network,stateText(language,row.state)];
@@ -37,5 +38,6 @@ export function tradeView(row:TradeRow,language:Language) {
     explorer="https://sepolia.etherscan.io/tx/"+row.tx_hash;lines.push(explorer);
   }
   lines.push(m.infrastructure,m.attribution);
-  return {id:row.id,state:row.state,version:row.version,expiresAt:row.expires_at,text:lines.join("\n\n"),explorer};
+  return {id:row.id,state:row.state,version:row.version,expiresAt:row.expires_at,text:lines.join("\n\n"),explorer,
+    ...(row.payload&&["REVIEW","SIGNATURES"].includes(row.state)?{details:authorizationReview(JSON.parse(row.payload) as Snapshot,language)}:{})};
 }

@@ -19,8 +19,9 @@ function fixture(){
   }};
 }
 test("wallet selection dispatches OKX to its official connector while MetaMask stays on Reown",()=>{
-  const okx=createWalletConnection("okx","ios",{projectId:"unused",origin:"https://bot.example"});assert(okx instanceof OkxConnection);
-  const mm=createWalletConnection("metamask","ios",{projectId:"unused",origin:"https://bot.example"});assert(!(mm instanceof OkxConnection));assert.equal(mm.choice,"metamask");okx.cancel();mm.cancel();
+  const currentOrigin=()=>"https://bot.example";
+  const okx=createWalletConnection("okx","ios",{projectId:"unused",origin:currentOrigin()},currentOrigin);assert(okx instanceof OkxConnection);
+  const mm=createWalletConnection("metamask","ios",{projectId:"unused",origin:currentOrigin()},currentOrigin);assert(!(mm instanceof OkxConnection));assert.equal(mm.choice,"metamask");okx.cancel();mm.cancel();
 });
 test("SDK Web3 link is passed unchanged to the mobile opener",()=>{
   for(const platform of ["ios","android"] as const){const opened:string[]=[];openWallet("okx",platform,uri,{https:u=>opened.push(u),native:()=>assert.fail()});assert.deepEqual(opened,[uri]);}

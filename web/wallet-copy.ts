@@ -34,6 +34,7 @@ export const routingText={
 } as const;
 export function connectionError(language:"ko"|"en",code:string){
   const ko=language==="ko",m=routingText[language];
+  if(code==="WALLET_ORIGIN_MISMATCH")return ko?"연결 주소가 현재 화면과 일치하지 않아 연결을 중단했어요. Telegram에서 /wallet으로 새 화면을 열어주세요.":"The connection address does not match this page. Connection stopped. Open a fresh screen using /wallet in Telegram.";
   if(code==="CONNECTION_TIMEOUT")return m.expired;
   if(code==="HANDOFF_FAILED")return ko?"지갑 앱을 열지 못했어요. 다시 연결해주세요.":"We could not open your wallet. Please try connecting again.";
   if(code==="NETWORK_MISMATCH")return ko?"지갑에서 Sepolia 테스트넷을 선택한 뒤 다시 연결해주세요.":"Choose Sepolia testnet in your wallet, then connect again.";

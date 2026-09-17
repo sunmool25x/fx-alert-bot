@@ -1,19 +1,21 @@
 # FX Alert Bot
 
-A Korean-first Telegram FX monitoring, alert and testnet trading interface powered by Sera Protocol.
+A Korean-first FX monitoring, alerting and user-controlled Telegram trading interface powered by Sera Protocol.
 
 환율과 거래 가능 규모를 확인하고, 원하는 FX 조건이 오면 Telegram으로 알려드려요.
 한국어가 기본이며 영어 명령어와 화면도 지원합니다.
 
 **Market monitoring → notable FX condition → Telegram alert → fresh quote → explicit confirmation → Sera trade flow.**
 
-- 🔔 Personalized FX alerts
+- 📊 Sera FX market monitoring
+- 🔔 Persistent personal FX alerts
 - 🔎 `/alpha` market-condition discovery
 - 🇰🇷 Korean natural-language requests
 - 💱 Fresh Sera quotes
-- 👛 OKX Wallet / MetaMask integration
+- 👛 Telegram Mini App wallet UX with verified OKX mobile connection; MetaMask acceptance pending
+- 🧪 Verified Sepolia funding and transparent Permit / Intent authorization review
 - 📊 Growth funnel analytics
-- 🛡 No auto-trading
+- 🛡 User-controlled execution; no server-held private keys or auto-trading
 
 Telegram: [@world_fx_alert_bot](https://t.me/world_fx_alert_bot) · Repository: [sunmool25x/fx-alert-bot](https://github.com/sunmool25x/fx-alert-bot)
 
@@ -21,6 +23,8 @@ Telegram: [@world_fx_alert_bot](https://t.me/world_fx_alert_bot) · Repository: 
 Mainnet is rejected. This is an experimental MVP, not an audited trading release.
 
 ## Current status
+
+The Sepolia test-token claim is finalized and reconciled. Read-only amount discovery found **2 test USDC → XSGD** to be the smallest successful tested quote; 1 USDC returned `No liquidity`. A transparent, separate Permit/Intent review is implemented. **No swap is submitted and execution stays OFF.** Fresh ownership and a new quote are required before any later authorization. See [Phase 7D evidence and architecture](PHASE7D.md) and the [acceptance gate](ACCEPTANCE.md#current-gate--phase-7d-review-prepared).
 
 | Evidence | Scope |
 |---|---|
@@ -35,6 +39,32 @@ additional client/theme coverage, phone alert delivery, Korean NLU and `/stats` 
 
 Read-only probes and mocked Telegram tests do not prove phone delivery or a completed trade.
 See [STATUS.md](STATUS.md) for dated evidence and [ACCEPTANCE.md](ACCEPTANCE.md) for remaining checks.
+
+## Sepolia verification
+
+The real OKX mobile connection and ownership signature were verified. One owner-approved testnet faucet claim succeeded, finalized, and was independently reconciled against the exact transaction, receipt and resulting test USDC/XSGD balances. Duplicate-claim protection and read-only status refresh are tested; wallet fee repricing is reconciled within the reviewed total cost ceiling.
+
+**TESTNET CLAIM VERIFICATION:** [successful Sepolia claim receipt](https://sepolia.etherscan.io/tx/0x0f71ead97bceb8e83b4de1e7b4eae9ef5a9f933f0f2cd5de25100c5d4a486448). This is funding evidence, **not a swap**. The explorer exposes public transaction participants; the active wallet is not repeated here.
+
+The latest bounded USDC/XSGD quote matrix found **2 test USDC** to be the smallest successful forward sample. Liquidity and costs can change; quote availability does not establish total market depth or guarantee execution. [Detailed results](PHASE7D.md#observed-liquidity-envelope) include both directions. Exact-amount ERC-2612 Permit, separate Sera Intent and relayer submission are prepared, with Korean/English review and **539 passing automated tests**. Real mobile financial signatures and swap settlement remain unverified.
+
+| Feature | Verification status |
+|---|---|
+| Sera market data / fresh quotes | Read-only verified |
+| Telegram bot / Mini App | Verified in local live testing |
+| OKX mobile connection / wallet ownership proof | Verified; proofs expire and must be renewed |
+| Sepolia faucet claim / balance reconciliation | Finalized and verified on-chain |
+| USDC → XSGD executable quote | Observed at 2/5/10/25/50/100 test USDC; time-specific evidence |
+| Permit / Intent review | Implemented; automated tests verified |
+| Real Permit / Intent mobile signatures | Pending |
+| Relayer submission / real Sera swap settlement | Pending |
+| MetaMask / Telegram Desktop acceptance | Pending |
+| Stable production deployment | Pending |
+| Mainnet trading / current swap execution | Disabled |
+
+This is an independent community build. Integration references: [Sera Protocol documentation](https://docs.sera.cx/) and [official Sepolia developer documentation](https://docs.testnet.sera.cx/). No official endorsement or Sera Community XP credit is claimed. [Sera Community](https://community.sera.cx/) describes GitHub connection for building and automatic counting on the next daily scan. Publication makes the build available for discovery; account linking, eligibility and actual dashboard credit must be checked separately.
+
+Dependency audit: **3 moderate package findings, 0 high, 0 critical**, unchanged in the existing OKX dependency chain. See [reconciliation validation](CLAIM_FLOW.md#reconciliation-correction) for details; these findings are not resolved by this publication.
 
 ## Why it's different
 

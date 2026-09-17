@@ -76,6 +76,21 @@ test("no-liquidity and token-minimum error envelopes are parsed without exposing
     await assert.rejects(new SeraClient(config, fetcher).getTokens(), { code });
   }
 });
+
+test("legacy quote No liquidity is classified without retrying, caching success or exposing provider text", async () => {
+  let calls=0;const client=new SeraClient(config,async()=>{calls++;return Response.json({detail:"No liquidity"},{status:400});},()=>NOW,async()=>{});
+  const request={from_token:A.address,to_token:B.address,from_amount:"1000000",owner_address:A.address,recipient:A.address,expiration:NOW/1000+300,gas_mode:"receive_less" as const};
+  await assert.rejects(client.getQuote(request),{code:"NO_LIQUIDITY",status:400});assert.equal(calls,1);
+});
+
+test("unknown error text or server outage is never interpreted as quote liquidity evidence", async () => {
+  for(const [status,detail] of [[400,"No liquidity https://private.example/key"],[500,"No liquidity"],[400,"secret provider error"]] as const){
+    const client=new SeraClient(config,async()=>Response.json({detail},{status}));
+    await assert.rejects(client.getQuote({from_token:A.address,to_token:B.address,from_amount:"1000000",owner_address:A.address,recipient:A.address,expiration:1,gas_mode:"receive_less"}),e=>{
+      assert(e instanceof AppError);assert.equal(e.code,"UNAVAILABLE");assert(!String(e).includes(detail));return true;
+    });
+  }
+});
 test("429 obeys Retry-After and retries GET; quote POST is never retried", async () => {
   let now = NOW, calls = 0;
   const fetcher: typeof fetch = async () => ++calls === 1

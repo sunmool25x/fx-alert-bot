@@ -46,7 +46,11 @@ export function databaseReady(path: string): boolean {
   try {
     db = new DatabaseSync(path, { readOnly: true });
     const versions = db.prepare("SELECT version FROM schema_migrations ORDER BY version").all().map(r => r.version);
-    if (!["[1,2,3,4]","[1,2,3,4,6]"].includes(JSON.stringify(versions))) return false;
+    if (!["[1,2,3,4]","[1,2,3,4,6]","[1,2,3,4,6,7]","[1,2,3,4,6,7,8]"].includes(JSON.stringify(versions))) return false;
+    if(versions.includes(7))for(const table of ["funding_claims","funding_claim_events"]){
+      if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table))return false;
+    }
+    if(versions.includes(8)&&!db.prepare('PRAGMA table_info(funding_claims)').all().some(r=>r.name==='evidence'))return false;
     if(versions.includes(6))for(const table of ["analytics_events","user_attribution","analytics_state"]){
       if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table))return false;
     }
@@ -81,7 +85,7 @@ export async function preflight(env: NodeJS.ProcessEnv, options: { offline?: boo
   add(c.wallet.users.length === 1 ? "PASS" : "FAIL", "BETA_ALLOWLIST", c.wallet.users.length === 1 ? "Exactly one beta tester configured; confirm it is your /wallet ID" : "Acceptance requires exactly one EXECUTION_USER_IDS entry; obtain your ID from /wallet");
   add("PASS", "SESSION_SECRETS", "Sessions use generated random credentials stored as hashes; no static session/encryption key is used");
   const root = options.root ?? process.cwd();
-  add(databaseReady(c.databasePath) ? "PASS" : "FAIL", "DATABASE", "Database must have supported migrations (4 or 6); start the bot with execution OFF to initialize/upgrade with backup");
+  add(databaseReady(c.databasePath) ? "PASS" : "FAIL", "DATABASE", "Database must have supported migrations (4, 6, 7 or 8); start the bot with execution OFF to initialize/upgrade with backup");
   add(["index.html", "app.js", "app.css", "THIRD_PARTY_LICENSES.txt"].every(f => existsSync(resolve(root, "dist/web", f))) ? "PASS" : "FAIL", "WEB_BUILD", "Signing frontend and license build; run npm run build if missing");
   add(c.wallet.origin ? "PASS" : "FAIL", "TELEGRAM_LAUNCH", "Inline private-chat Web App URL derives from SIGNING_ORIGIN; /newapp and Login Widget /setdomain are not required");
   add("WARN", "REOWN_ALLOWLIST", options.development?"Dedicated development Reown project: documented empty allowlist permits changing tunnel origins; actual relay access remains untested":"For stable hosting allow the exact origin; dev:live supports a dedicated development project with Reown's documented empty allowlist");

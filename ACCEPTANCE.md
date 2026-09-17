@@ -2,7 +2,69 @@
 
 Start with [README: Start Live Testing](README.md#start-live-testing). Telegram mobile Mini App launch, official OKX Web3 handoff, connection and backend ownership verification have been successfully tested. MetaMask, Telegram Desktop, real swap submission and settlement remain unverified. Preserve existing private credentials. The launcher manages the tunnel/origin and rebuilds source changes on new launches. Mark a box only after **you perform that check**. Automated tests and public probes are recorded separately in [STATUS.md](STATUS.md); they do not complete phone tests.
 
-## Current scope — Phase 6
+## Current gate — Phase 7D review prepared
+
+The complete read-only matrix found a positive forward quote at **2 test USDC**, the smallest successful tested amount; this is classification **B**, not pair-wide no liquidity. Use USDC → XSGD; no fallback. See [matrix, costs and verified Permit/Intent/relayer architecture](PHASE7D.md). Discovery does not change a user's amount, create a trade or authorize execution.
+
+- [x] Twenty bounded, paced quote probes; exact token identities and same-wallet recipient.
+- [x] Forward successful quotes validated against live Permit nonce/domain and on-chain Intent digest.
+- [x] Separate Korean/English ownership, Permit and Intent explanations; transparent read-only review implementation and automated tests.
+- [x] Mainnet and swap execution OFF; existing claim and database state preserved; no new transaction.
+- [ ] Renew the expired ownership proof through the existing wallet flow.
+- [ ] Owner views a NEW two-USDC quote and its review in the authenticated mobile Mini App; the matrix's expired quotes cannot be reused.
+- [ ] In a later separately authorized execution session only: exact-amount Permit, Intent and one owner-triggered relayer submission.
+- [ ] Actual canonical finalized SOR event, exact token transfer bounds and final wallet balances independently verified.
+
+There are two **financial** wallet signatures; ownership renewal is separate. No financial request is pending now. Keep `dev:live` execution OFF. Do not begin a claim again, promote public probe data into an authenticated session, or mark automated/UI-fixture checks as owner phone acceptance.
+
+## Historical gate — Phase 7C quote unavailable
+
+At 07:14 UTC on 2026-09-17, fresh ownership, sufficient exact USDC/XSGD balances and the Sepolia deployment were checked for the acceptance wallet. The same-wallet **1 test USDC → XSGD** quote returned HTTP 400 `No liquidity`. This is a rejected quote, not a failed on-chain swap. No wallet request, trade row, signature, submission or transaction was created. Execution and mainnet remain OFF. Owner activity remains excluded from production analytics through the existing configured exclusion policy.
+
+- [x] Fresh ownership and Sepolia funds checked for the exact acceptance wallet.
+- [x] Current quote requested for exactly 1 USDC, without promoting scanner/alert/cache data.
+- [x] Unavailable quote rejected; size and execution policy unchanged.
+- [ ] Executable quote with verified minimum output, costs and expiry.
+- [ ] Transparent Mini App financial review and explicit confirmation.
+- [ ] Separate Permit and Intent approvals in OKX, then exactly one Sera submission.
+- [ ] Broadcast/mining/finalized Sera settlement and final balances.
+- [ ] Completion commit `feat: verify end-to-end Sepolia swap` and push to main, only after real settlement is verified.
+
+The selected Sera path is relayed: Permit plus Intent signatures authorize one swap; the user does not approve a faucet-style native `eth_sendTransaction`. The UI must accurately explain both approvals and the quoted token cost. The single-native-request wording in the Phase 7C request does not match the current official API/architecture. No alternate transaction path or approval bypass was implemented. Before eventual activation, enforce the requested one-swap scope and recheck a fresh ownership session and executable quote.
+
+## Completed funding — Phase 7B claim verified, first swap still disabled
+
+The owner approved one transparent in-app claim. Its existing persisted transaction was independently verified as a successful, canonical finalized Sepolia `claim()` to the documented faucet, with zero ETH value. The same record is now `CLAIM_BALANCES_VERIFIED`; **do not press claim again**. The opaque Etherscan manual write flow is retired from acceptance.
+
+- [x] Actual exact-contract USDC/XSGD transfers and their on-chain decimals verified: 10^15 raw units each, 6 decimals, 1 billion displayed test tokens each.
+- [x] Native receipt verified including actual gas: 0.1 + 0.01 − 0.016194067970106649 = 0.093805932029893351 Sepolia ETH.
+- [x] Original fee mismatch identified and repaired under the reviewed total cost ceiling; no second claim or swap submitted.
+- [x] Existing hash, request snapshot and duplicate lock preserved; evidence stored after independent recheck.
+- [x] Automated HTTP refresh/idempotency, RPC delay and fee-budget regressions pass. Korean/English success, pending and failure rendering use isolated UI fixtures; these are not a claim of mobile UX acceptance.
+- [ ] Owner sees the repaired success state in the updated authenticated Mini App.
+- [ ] First fresh 1 test USDC → XSGD quote through the existing ownership-gated preflight.
+- [ ] Swap approval/submission/settlement acceptance — **not authorized by this reconciliation task**.
+
+`수령 상태 확인` only re-reads the existing transaction and updates verification evidence. It cannot create a claim or submit a transaction. If the browser session expires, use a fresh `/wallet` ownership session to view the existing record; do not reset the claim or remove its lock. The internal operator command `node --use-system-ca --import tsx scripts/reconcile-claim.ts` reconciles only the single allowlisted wallet's already-attempted persisted hash and does not require a wallet request. Details and cost bounds: [CLAIM_FLOW.md](CLAIM_FLOW.md#reconciliation-correction).
+
+Mainnet and swap execution remain OFF. Preserve earlier diagnostics as history; the earlier generic mismatch message was not evidence that the assets failed to arrive.
+
+## Historical gate — Phase 7A domain trust
+
+See [WALLET_TRUST.md](WALLET_TRUST.md) for the confirmed external Etherscan subdomain mismatch, exact source evidence and application guards. The historical mobile connection is not evidence that this warning has disappeared. Do not reuse the affected Etherscan WalletConnect QR or ask an owner to ignore a wallet warning.
+
+- [x] Identify actual page/iframe origin versus published third-party metadata URL.
+- [x] Add and test the bot's exact-origin, own-session-metadata and callback guards; retain Sepolia-only financial gates.
+- [x] Show TESTNET, selected wallet, purpose, actual expected domain and no-swap-consent explanation in Korean/English.
+- [x] Owner reports a fresh post-reboot bot /wallet connection and ownership verification without a domain-mismatch warning. Read-only server checks independently confirm a fresh, unexpired proof for the exact acceptance wallet. This does not verify the external funding site's connection.
+- [ ] Independently verify a supported external Sera funding connection's truthful domain without the affected Etherscan QR. A proposed direct/injected alternative is not yet device-verified.
+- [ ] Before one claim request, verify exact acceptance wallet, fresh proof, Sepolia, gas, official contract, OFF flags and no duplicate/pending claim. Preserve the successful single ETH faucet attempt.
+- [ ] Owner approves the claim; confirm successful Sepolia receipt and exact-token balance increase. Sera's fixed bundle cannot be requested as a custom one-USDC quantity.
+- [ ] Prepare a fresh one-USDC swap preflight under a hard five-USDC acceptance cap. No automatic swap submission.
+
+Latest read-only claim preparation, 2026-09-17 04:16 UTC: 0.1 Sepolia ETH; zero test USDC/XSGD; hasClaimed=false; no unmined outgoing transaction; zero bot trade attempts. claim() simulation and gas affordability checks passed, with an unsigned description retained only in ignored local evidence. No claim request was submitted. External funding connection trust and end-to-end swap acceptance remain **UNVERIFIED**; the owner confirmed the fresh bot connection was warning-free. Mainnet and swap execution remain OFF. Refresh eligibility, pending transactions and gas before requesting approval.
+
+## Historical scope — Phase 6
 
 Execution OFF, mainnet OFF, no transaction submitted. The prior real OKX transport is owner-confirmed; the latest combined ownership tap and Korean NLU still need phone acceptance. Keep every new box unchecked until personally tested. Automated results and read-only live Sera probes are recorded separately in STATUS.md.
 
@@ -375,11 +437,11 @@ Insufficient faucet inventory can leave a pending claim. Check balances and seek
 npm run funding:smoke
 ~~~
 
-The single pair remains **USDC → XSGD**. A **5 USDC** probe returned a positive validated quote; a 1 USDC probe failed. Five is the smallest successful amount tested here, not a permanent protocol minimum or liquidity guarantee. Start the manual preview at 5. If unavailable, stop and report the code; the application will not resize it.
+The single pair remains **USDC → XSGD**. Phase 7D's complete matrix selected **2 test USDC** as the smallest successful tested amount; 1 USDC failed. This supersedes the earlier five-USDC sample, not the runtime cap. It is not a permanent minimum or liquidity guarantee. Start the manual preview at 2. If unavailable, stop and report the code; the application will not resize it.
 
 ### Complete the read-only execution gate
 
-With execution false, use /quote 5 USDC XSGD and continue into the Mini App. Connect/verify first, then press **내 지갑의 최신 Quote 확인**. This fetches a NEW wallet-specific quote with the same verified recipient and the same contract, balance, permit-metadata and amount checks. It returns display terms only, **no signable trade/version**.
+With execution false, use /quote 2 USDC XSGD and continue into the Mini App. Connect/verify first, then press **내 지갑의 최신 Quote 확인**. This fetches a NEW wallet-specific quote with the same verified recipient and the same contract, balance, permit-metadata and amount checks. It returns display terms only, **no signable trade/version**.
 
 Check input, minimum received (not an invented expected output), rate direction, addresses, costs, expiry and the two future Permit/Intent approvals. Wait for expiry, then request a new preview. Quote life is about 30 seconds with a five-second safety cutoff; it is never extended.
 
@@ -389,7 +451,7 @@ Check input, minimum received (not an invented expected output), rate direction,
 
 Financial authorization remains deferred. **dev:live cannot enable trading.** Only after the full owner gate passes in a later session may the owner explicitly authorize the existing execution workflow through the ordinary runtime (`npm start`), with a stable HTTPS origin and all safety gates satisfied. Keep execution false until that separately authorized session.
 
-Use /swap 5 USDC XSGD or an existing quote/alert/alpha continuation. Obtain a NEW wallet quote; the read-only preview cannot be promoted. Review its current exact terms and confirm. Explicitly approve the exact token-use Permit, then the Sera Intent, then submit **once**. Both financial requests are explained before they start and remain separate from ownership. Cancellation/expiry requires fresh review and signatures.
+Use /swap 2 USDC XSGD or an existing quote/alert/alpha continuation. Obtain a NEW wallet quote; the read-only preview cannot be promoted. Review its current exact terms and confirm. Explicitly approve the exact token-use Permit, then the Sera Intent, then submit **once**. Both financial requests are explained before they start and remain separate from ownership. Cancellation/expiry requires fresh review and signatures.
 
 Expect SUBMITTING, PENDING, CONFIRMED, FAILED or UNKNOWN. Telegram and Mini App **상태 새로 확인** invoke the same owner-scoped read-only reconciliation, respecting polling/backoff; they cannot submit. Only the matching SOR Intent event and finalized canonical successful receipt with valid token amounts produce completion, verified amounts, IDs, actual hash and explorer button. Finalization can take many minutes. Missing evidence remains unresolved, possibly indefinitely, without an automatic retry or timed release.
 

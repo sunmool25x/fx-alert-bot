@@ -218,7 +218,9 @@ test("Mini App uses FX Alert Bot identity and preserves license attribution", ()
   assert.match(html, /Testnet trading powered by Sera Protocol/);
     assert.match(html, /THIRD_PARTY_LICENSES.txt/); assert.match(html, /Reown, Inc/);
     const routing = readFileSync(new URL("../web/routing-client.ts", import.meta.url), "utf8");
-    assert.match(routing, /metadata:\{name:"FX Alert Bot"/);
+    assert.match(routing, /metadata=walletMetadata\(origin,location.origin,environment\)/);
+    const trust = readFileSync(new URL("../web/wallet-trust.ts", import.meta.url), "utf8");
+    assert.match(trust, /name:"FX Alert Bot"/);
   assert.doesNotMatch(html + app, /Sera Korea|Sera FX Bot/);
 });
 

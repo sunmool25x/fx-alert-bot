@@ -1,12 +1,14 @@
 import { WalletFlowError } from "./connection.js";
 import type { TelegramEnvironment } from "./routing.js";
+import { walletRedirect } from "./wallet-trust.js";
+import { assertClaimTransaction } from "../src/claims/protocol.js";
 export const OKX_CHAIN="eip155:11155111";
 export const OKX_MIN_VERSION="6.88.0";
 // OKX Connect 1.9.1 public ConnectWalletType.OKX_APP_COMMON. This selects
 // the SDK's Web3 app connector, not the exchange download URL or a TON connector.
 export function okxConnectParams(environment:TelegramEnvironment) {
   return {namespaces:{eip155:{chains:[OKX_CHAIN],defaultChain:"11155111"}},
-    sessionConfig:{connectWalletType:130,openUniversalUrl:false,redirect:environment==="desktop"?"none":"tg://resolve"}};
+    sessionConfig:{connectWalletType:130,openUniversalUrl:false,redirect:walletRedirect(environment,"okx")}};
 }
 export function assertOkxLink(value:unknown,requireTopic=true):string {
   if(typeof value!=="string"||value.length>2048)throw new WalletFlowError("WALLET_CONNECT_CANCELLED");
@@ -35,7 +37,11 @@ export function okxSnapshot(value:unknown,expectedTopic:string):OkxSnapshot {
   });
   return {topic:s.topic,accounts,chainId:11155111};
 }
-export function assertOkxRequest(args:{method:string;params:unknown[]}) {
+export function assertOkxRequest(args:{method:string;params:unknown[]},owner?:string) {
+  if(args.method==="eth_sendTransaction"){
+    if(!owner||args.params.length!==1)throw new WalletFlowError("WALLET_REQUIRED");
+    assertClaimTransaction(args.params[0],owner);return;
+  }
   // Transport only. The parent/backend still own consent, challenge and trading gates.
   if(!["personal_sign","eth_signTypedData_v4","wallet_switchEthereumChain"].includes(args.method))throw new WalletFlowError("WALLET_REQUIRED");
   if(args.method==="wallet_switchEthereumChain"&&(args.params[0] as {chainId?:unknown})?.chainId!=="0xaa36a7")throw new WalletFlowError("NETWORK_MISMATCH");

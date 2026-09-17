@@ -1,3 +1,6 @@
+import { ClaimService } from "../claims/service.js";
+import { SepoliaClaimChain,claimClient,type ClaimChain } from "../claims/chain.js";
+import { ClaimError } from "../claims/protocol.js";
 import { createServer,type IncomingMessage,type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -21,7 +24,8 @@ async function body(req:IncomingMessage) {
   for await(const chunk of req) {size+=chunk.length;if(size>20000)throw new AppError("AUTH_INVALID");chunks.push(chunk);}
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
 }
-export function signingServer(config:Config,store:Store,chain:ChainReads,trades:TradeService,now=Date.now,refresh?: (user:string)=>Promise<void>) {
+export function signingServer(config:Config,store:Store,chain:ChainReads,trades:TradeService,now=Date.now,refresh?: (user:string)=>Promise<void>,claimChain?:ClaimChain) {
+  const claims=new ClaimService(store,claimChain??new SepoliaClaimChain(claimClient(config.wallet.rpc),now),config,now);
   const auth=new WalletAuth(store.wallet,config.wallet,a=>chain.eoa(a),now),limits=new Map<string,{at:number;count:number}>();
   const handler=async(req:IncomingMessage,res:ServerResponse)=>{
     let language:Language="ko";
@@ -56,17 +60,25 @@ export function signingServer(config:Config,store:Store,chain:ChainReads,trades:
         const session=store.wallet.newSession(user.id,telegram.hash,config.wallet.sessionMs);
         acceptanceLog("auth","TG_SESSION_CREATED",user.id);
         res.setHeader("set-cookie",`__Host-sera=${session.token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${config.wallet.sessionMs/1000}`);
-        send(200,{csrf:session.csrf,language,userId:user.id,projectId:config.wallet.projectId,origin:config.wallet.origin,ready:config.wallet.ready,enabled:config.wallet.enabled&&config.wallet.users.includes(user.id)});return;
+        send(200,{csrf:session.csrf,language,userId:user.id,projectId:config.wallet.projectId,origin:config.wallet.origin,ready:config.wallet.ready,claimEnabled:claims.available(user.id),enabled:config.wallet.enabled&&config.wallet.users.includes(user.id)});return;
       }
       const token=req.headers.cookie?.match(/(?:^|;\s*)__Host-sera=([a-f0-9]{64})(?:;|$)/)?.[1];
       const s=token?store.wallet.session(token):undefined;if(!s)throw new AppError("AUTH_STALE");
       language=(await store.user(s.user_id))?.language??"ko";
       userRef=s.user_id;walletRef=s.wallet??undefined;
       auth.csrf(s,String(req.headers["x-csrf-token"]??""));
-      if(["/api/preview","/api/prepare","/api/challenge","/api/submit","/api/refresh","/api/diagnostic"].includes(path)) {
+      if(["/api/preview","/api/prepare","/api/challenge","/api/submit","/api/refresh","/api/diagnostic","/api/claim/prepare","/api/claim/confirm","/api/claim/refresh","/api/claim/report","/api/claim/preview"].includes(path)) {
         const k=s.user_id+path,b=limits.get(k);
         if(!b||now()-b.at>=60000)limits.set(k,{at:now(),count:1});else if(++b.count>6)throw new AppError("RATE_LIMITED");
       }
+      if(path==="/api/claim/list") {z.object({}).strict().parse(data);send(200,{claims:claims.list(s)});return;}
+      if(path==="/api/claim/prepare") {z.object({}).strict().parse(data);send(200,await claims.prepare(s));return;}
+      if(path==="/api/claim/confirm") {const d=z.object({id,version:id}).strict().parse(data);send(200,await claims.confirm(s,d.id,d.version));return;}
+      if(path==="/api/claim/report") {const d=z.object({id,hash:z.string().regex(/^0x[0-9a-fA-F]{64}$/)}).strict().parse(data);send(200,await claims.report(s,d.id,d.hash as Hex));return;}
+      if(path==="/api/claim/rejected") {const d=z.object({id}).strict().parse(data);send(200,claims.rejected(s,d.id));return;}
+      if(path==="/api/claim/cancel") {const d=z.object({id}).strict().parse(data);send(200,claims.cancel(s,d.id));return;}
+      if(path==="/api/claim/refresh") {const d=z.object({id}).strict().parse(data);send(200,await claims.refresh(s,d.id));return;}
+      if(path==="/api/claim/preview") {const d=z.object({id}).strict().parse(data);const intent=await claims.firstSwapIntent(s,d.id);send(200,previewView(await trades.preview(s,intent),language));return;}
       if(path==="/api/state"||path==="/api/refresh") {
         z.object({}).strict().parse(data);
         if(path==="/api/refresh"){await refresh?.(s.user_id);acceptanceLog("refresh","OK",userRef,walletRef);}
@@ -113,7 +125,7 @@ export function signingServer(config:Config,store:Store,chain:ChainReads,trades:
       if(path==="/api/cancel") {const d=z.object({id}).strict().parse(data);trades.cancel(s,d.id);send(200,{ok:true});return;}
       if(path==="/api/submit") {const d=z.object({id,version:id,signature,permitSignature:signature}).strict().parse(data);send(200,tradeView(await trades.submit(s,d.id,d.version,d.signature as Hex,d.permitSignature as Hex),language));return;}
       throw new AppError("AUTH_INVALID");
-    } catch(e) {const code=safeWalletCode(e instanceof AppError?errorCode(e):"AUTH_INVALID");acceptanceLog(operation,code,userRef,walletRef);send(code==="RATE_LIMITED"?429:400,{code,message:walletFailure(language,code)});}
+    } catch(e) {const code=safeWalletCode(e instanceof ClaimError?e.code:e instanceof AppError?errorCode(e):"AUTH_INVALID");acceptanceLog(operation,code,userRef,walletRef);send(code==="RATE_LIMITED"?429:400,{code,message:walletFailure(language,code)});}
   };
   const server=createServer((req,res)=>{void handler(req,res);});server.requestTimeout=20000;server.headersTimeout=10000;server.maxHeadersCount=30;
   return server;

@@ -1,3 +1,6 @@
+import { claimPanel } from "./claim-panel.js";
+import { renderTradeReview } from "./trade-review.js";
+import type { AuthorizationReview } from "../src/trades/review.js";
 import type { ConnectedProvider } from "./connector-types.js";
 import { walletText,stateText,walletFailure,walletError,safeWalletCode } from "../src/i18n/wallet.js";
 import { fromRawUnits } from "../src/sera/precision.js";
@@ -5,13 +8,15 @@ import { connectAndVerify,prepareOwnership,switchSepolia,checkWallet,WalletFlowE
 import { walletPicker } from "./wallet-picker.js";
 import { bindWalletTheme,type TelegramTheme } from "./wallet-theme.js";
 import { renderWalletCard,walletCardText } from "./wallet-card.js";
+import { assertWalletOrigin } from "./wallet-trust.js";
 declare global {interface Window {Telegram?:{WebApp:TelegramTheme&{initData:string;platform?:string;ready():void;expand():void;openLink?(url:string):void}}}}
-type Review={id:string;version:string;state:string;expiresAt:number;text:string;explorer?:string};
+type Review={id:string;version:string;state:string;expiresAt:number;text:string;explorer?:string;details?:AuthorizationReview};
 let language:"ko"|"en"="ko",csrf="",wallet="",provider:ConnectedProvider|undefined;
 let active:Review|undefined,authorized:{intent:unknown;permit:unknown;version:string}|undefined,permitSignature="",intentSignature="";
 let accountEpoch=0,busy=false,allowExecution=false;
 let authenticatedUser="",walletPending=false;
 let ownershipLock:object|undefined;
+let funding:ReturnType<typeof claimPanel>|undefined;
 let paintWallet:(address?:string)=>void=()=>{};
 const el=(id:string)=>document.getElementById(id)!;
 const message=(text:string)=>{el("message").textContent=text;};
@@ -32,7 +37,8 @@ function button(parent:string,text:string,action:()=>Promise<void>,primary=false
 function showReview(review:Review) {
   active=review;el("review").replaceChildren();const text=document.createElement("pre");
   // Preserve the server's exact terms while reflecting local submitting/expiry transitions.
-  const sections=review.text.split("\n\n");sections[1]=stateText(language,review.state);text.textContent=sections.join("\n\n");el("review").append(text);
+  const sections=review.text.split("\n\n");sections[1]=stateText(language,review.state);text.textContent=sections.join("\n\n");
+  if(review.details)renderTradeReview(el("review"),review.details,sections[1]!);else el("review").append(text);
   if(review.state!=="REVIEW"&&review.state!=="SIGNATURES")return;
   if(!allowExecution)return; // No financial consent UI in read-only preparation.
   if(review.state==="REVIEW") {
@@ -70,7 +76,7 @@ function showSigning() {
   },true);submit.disabled=true;
 }
 async function invalidate() {
-  accountEpoch++;wallet="";clearAuthorization();active=undefined;el("review").replaceChildren();
+  funding?.invalidate();accountEpoch++;wallet="";clearAuthorization();active=undefined;el("review").replaceChildren();
   paintWallet();el("balances").replaceChildren();
   await api("disconnect");message(m().disconnected);
 }
@@ -79,6 +85,7 @@ async function status(reconcile=false) {
   if(result.userId!==authenticatedUser)throw new WalletFlowError("AUTH_INVALID");
   if(wallet&&result.wallet!==wallet){accountEpoch++;wallet="";clearAuthorization();active=undefined;el("review").replaceChildren();}
   paintWallet(result.wallet??undefined);
+  if(wallet&&funding)await funding.refresh();
   el("history").replaceChildren();for(const trade of result.trades as Review[]) {
     const p=document.createElement("pre");p.textContent=trade.text;el("history").append(p);
     if(trade.explorer&&/^https:\/\/sepolia\.etherscan\.io\/tx\/0x[0-9a-fA-F]{64}$/.test(trade.explorer)){const a=document.createElement("a");a.href=trade.explorer;a.textContent=m().explorer;a.target="_blank";a.rel="noopener noreferrer";el("history").append(a);}
@@ -88,6 +95,7 @@ async function status(reconcile=false) {
 async function main() {
   const tg=window.Telegram?.WebApp;bindWalletTheme(tg);if(!tg?.initData){message(m().openTelegram);return;}
   tg.ready();tg.expand();const c=await api("auth",{initData:tg.initData});csrf=c.csrf;language=c.language;allowExecution=c.enabled;authenticatedUser=c.userId;
+  assertWalletOrigin(c.origin,location.origin);
   const copy=walletCardText[language];document.documentElement.lang=language;el("safety").textContent=m().safety;
   el("identity").textContent=copy.authenticated;el("identity-summary").textContent=copy.details;el("identity-id").textContent="Telegram ID: "+authenticatedUser;el("identity-details").hidden=false;
   el("mode").textContent=allowExecution?m().enabled:copy.readOnly;message("");diagnostic("MINI_APP_OPENED");
@@ -116,6 +124,11 @@ async function main() {
     },balance:()=>walletAction(readBalances),
   });
   paintWallet=address=>renderWalletCard(el("account"),language,address,{connect:()=>walletAction(()=>picker.choose()),balance:()=>walletAction(readBalances),disconnect:()=>walletAction(async()=>{picker.cancel();provider=undefined;await invalidate();await status();})});
+  if(c.claimEnabled){
+    const section=document.createElement("section");section.id="funding";el("balances").after(section);
+    funding=claimPanel({root:section,language,api,provider:()=>provider,owner:()=>wallet,epoch:()=>accountEpoch,swapsEnabled:()=>allowExecution,
+      originGuard:()=>assertWalletOrigin(c.origin,location.origin),ready:()=>picker.claimReady(),handoff:()=>picker.requestHandoff(),pending:v=>{walletPending=v;},preview:showReview});
+  }
   button("wallet-tools",m().switchChain,async()=>{if(!provider?.session)throw new WalletFlowError("WALLET_REQUIRED");await invalidate();await switchSepolia(provider);message(m().network+" · "+m().connect);});
   const params=new URLSearchParams(location.hash.slice(1)),intent=params.get("intent");history.replaceState(null,"",location.pathname);
   if(intent)button("actions",m().prepare,async()=>{

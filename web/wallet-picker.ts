@@ -5,6 +5,7 @@ import { clearLegacyWalletRouting,openWallet,telegramEnvironment,walletRoutes,ty
 import { routingText,connectionError } from "./wallet-copy.js";
 import { WalletFlow,supportedWallets,type WalletScreen } from "./wallet-flow.js";
 import type { PreparedOwnership } from "./connection.js";
+import { assertWalletOrigin,renderWalletTrust } from "./wallet-trust.js";
 type Telegram={platform?:string;openLink?(url:string):void};
 export function walletPicker(options:{root:HTMLElement;language:"ko"|"en";telegram:Telegram;projectId:string;origin:string;
   message:(text:string)=>void;error:(error:unknown)=>void;invalidate:()=>Promise<void>;
@@ -13,6 +14,7 @@ export function walletPicker(options:{root:HTMLElement;language:"ko"|"en";telegr
   pending:(value:boolean)=>void;balance?:()=>void;started?:()=>void;
   createConnection?:(choice:WalletChoice)=>WalletConnection}) {
   const {root,language,telegram}=options,m=routingText[language],environment=telegramEnvironment(telegram.platform);
+  const trustedOrigin=assertWalletOrigin(options.origin,location.origin);
   const dialog=document.createElement("dialog");dialog.className="wallet-sheet";dialog.setAttribute("aria-labelledby","wallet-sheet-title");
   const bar=document.createElement("div");bar.className="sheet-bar";
   const title=document.createElement("h2");title.id="wallet-sheet-title";title.tabIndex=-1;
@@ -34,6 +36,7 @@ export function walletPicker(options:{root:HTMLElement;language:"ko"|"en";telegr
     dialog.dataset.step=screen.step;body.replaceChildren();body.classList.toggle("is-loading",screen.step==="preparing");
     const name=screen.choice?walletRoutes[screen.choice].name:"";
     title.textContent=screen.step==="selecting"?m.title:screen.step==="success"?m.success:screen.step==="error"?m.errorTitle:["ownership","verifying"].includes(screen.step)?m.ownershipTitle:name;
+    if(!["error","success"].includes(screen.step))renderWalletTrust(body,language,trustedOrigin,screen.choice);
     if(screen.step==="selecting"){
       paragraph(m.choose);
       for(const choice of supportedWallets){
@@ -94,5 +97,5 @@ export function walletPicker(options:{root:HTMLElement;language:"ko"|"en";telegr
     }),
   });
   close.onclick=()=>flow.close();dialog.addEventListener("cancel",e=>{e.preventDefault();flow.close();});
-  return {choose:()=>flow.choose(),cancel:()=>flow.cancel(),lost:()=>flow.lost()};
+  return {choose:()=>flow.choose(),cancel:()=>flow.cancel(),lost:()=>flow.lost(),claimReady:()=>flow.claimReady(),requestHandoff:()=>flow.requestHandoff()};
 }

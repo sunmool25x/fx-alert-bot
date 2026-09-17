@@ -19,7 +19,8 @@
     "scanner:smoke": "tsx scripts/scanner-smoke.ts",
     "wallet:smoke": "tsx scripts/wallet-smoke.ts",
     "wallet:preflight": "node --use-system-ca --import tsx scripts/wallet-preflight.ts",
-    "funding:smoke": "tsx scripts/funding-smoke.ts"
+    "funding:smoke": "tsx scripts/funding-smoke.ts",
+    "quotes:discover": "node --use-system-ca --import tsx scripts/discover-quotes.ts"
   },
   "dependencies": {
     "@grammyjs/auto-retry": "2.0.2",

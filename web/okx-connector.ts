@@ -24,15 +24,17 @@ export function browserOkxBridge(environment:TelegramEnvironment):OkxBridge {
 }
 export class OkxConnection implements WalletConnection,ConnectedProvider {
   readonly choice="okx";
+  claimSupported=false;
   accounts:string[]=[];chainId=11155111;session?:OkxSnapshot;handoffUri?:string;
   private live=true;private topic="";private sequence=0;private timer?:ReturnType<typeof setTimeout>;
+  private claimRequested=false;
   private rejection?:(error:Error)=>void;
   private requests=new Map<number,{resolve:(value:unknown)=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
   private listeners=new Map<string,Set<(...args:any[])=>void>>();
-  constructor(readonly environment:TelegramEnvironment,private bridge:OkxBridge=browserOkxBridge(environment)){}
+  constructor(readonly environment:TelegramEnvironment,private bridge:OkxBridge=browserOkxBridge(environment),private originGuard=()=>{}){}
   on(event:string,listener:(...args:any[])=>void){const set=this.listeners.get(event)??new Set();set.add(listener);this.listeners.set(event,set);}
   private emit(event:string){for(const listener of this.listeners.get(event)??[])listener();}
-  assertActive(){if(!this.live)throw new WalletFlowError("WALLET_CONNECT_CANCELLED");}
+  assertActive(){try{this.originGuard();}catch(e){this.cancel();throw e;}if(!this.live)throw new WalletFlowError("WALLET_CONNECT_CANCELLED");}
   assert(){this.assertActive();if(!this.session||!this.topic||this.session.topic!==this.topic||this.session.chainId!==11155111||!this.accounts[0])throw new WalletFlowError("WALLET_REQUIRED");}
   start(onUri:(uri:string)=>void,onExpired:()=>void):Promise<ConnectedProvider> {
     this.assertActive();
@@ -41,6 +43,7 @@ export class OkxConnection implements WalletConnection,ConnectedProvider {
       this.bridge.start(message=>{
         if(!this.live)return;
         try{
+          this.assertActive();
           if(message.type==="uri"){
             if(this.session||this.topic)throw new WalletFlowError("WALLET_REQUIRED");
             const uri=assertOkxLink(message.uri);
@@ -52,6 +55,7 @@ export class OkxConnection implements WalletConnection,ConnectedProvider {
             if(!snapshot||snapshot.topic!==this.topic||!this.topic||snapshot.chainId!==11155111||!Array.isArray(snapshot.accounts)||!snapshot.accounts.length||snapshot.accounts.some(a=>typeof a!=="string"||!/^0x[0-9a-fA-F]{40}$/.test(a)))throw new WalletFlowError("WALLET_REQUIRED");
             const changed=this.session&&JSON.stringify(snapshot.accounts)!==JSON.stringify(this.accounts);
             this.session=snapshot;this.accounts=[...snapshot.accounts];this.chainId=snapshot.chainId;
+            this.claimSupported=message.claimSupported===true;
             if(message.type==="connected"){
               this.handoffUri=assertOkxLink(message.requestUri,false);clearTimeout(this.timer);this.rejection=undefined;resolve(this);
             }else if(changed)this.emit("accountsChanged");
@@ -68,7 +72,14 @@ export class OkxConnection implements WalletConnection,ConnectedProvider {
   }
   async connect(){this.assert();} // Ownership must never initiate a second connector.
   request(args:{method:string;params:unknown[]}):Promise<unknown> {
-    this.assert();assertOkxRequest(args);const id=++this.sequence;
+    this.assert();assertOkxRequest(args,this.accounts[0]);
+    if(args.method==="eth_sendTransaction"){
+      if(!this.claimSupported)throw new WalletFlowError("CLAIM_DISABLED");
+      if(this.claimRequested)throw new WalletFlowError("CLAIM_BUSY");
+      this.claimRequested=true;
+      args={method:args.method,params:[Object.freeze({...args.params[0] as object})]};
+    }
+    const id=++this.sequence;
     return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.requests.delete(id);reject(new WalletFlowError("OWNERSHIP_REJECTED"));},120_000);
       this.requests.set(id,{resolve,reject,timer});this.bridge.send({type:"request",id,args});});
   }

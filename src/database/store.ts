@@ -1,3 +1,4 @@
+import { ClaimStore,migrateClaims } from "./claims.js";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
@@ -29,6 +30,7 @@ export interface Store {
   readonly analytics:AnalyticsStore;
   readonly inputOrigins:InputOrigins;
   readonly wallet: WalletStore;
+  readonly claims: ClaimStore;
   readonly alerts: AlertStore;
   readonly scanner: ScannerStore;
   touch(id: string, source?: string): Promise<User>;
@@ -46,6 +48,7 @@ export class SqliteStore implements Store {
   readonly analytics:AnalyticsStore;
   readonly inputOrigins:InputOrigins;
   readonly wallet: WalletStore;
+  readonly claims: ClaimStore;
   private db: DatabaseSync;
   readonly alerts: SqliteAlertStore;
   readonly scanner: SqliteScannerStore;
@@ -89,6 +92,16 @@ export class SqliteStore implements Store {
     migrateScanner(this.db);
     this.scanner = new SqliteScannerStore(this.db, now);
     migrateWallet(this.db);
+    if(existed && !this.db.prepare("SELECT 1 FROM schema_migrations WHERE version=7").get()){
+      const backup=path+".before-phase7b-"+Date.now()+"-"+shortId()+".sqlite";
+      this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
+    }
+    if(existed && this.db.prepare("SELECT 1 FROM schema_migrations WHERE version=7").get() && !this.db.prepare("SELECT 1 FROM schema_migrations WHERE version=8").get()) {
+      const backup=path+".before-claim-reconciliation-"+Date.now()+"-"+shortId()+".sqlite";
+      try{this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");}catch(e){this.db.close();throw e;}
+    }
+    migrateClaims(this.db);
+    this.claims=new ClaimStore(this.db,now);
     this.inputOrigins=new InputOrigins(this.db);
     migrateAnalytics(this.db,now());
     this.analytics=new AnalyticsStore(this.db,now);
@@ -132,6 +145,6 @@ export class SqliteStore implements Store {
     return this.db.prepare("SELECT * FROM quote_intents WHERE id=? AND user_id=? AND expires_at>?")
       .get(id, user, this.now()) as unknown as QuoteIntent | undefined;
   }
-  async forget(id: string) { this.wallet.forget(id); this.db.prepare("DELETE FROM users WHERE id=?").run(id); }
+  async forget(id: string) { this.claims.forget(id); this.wallet.forget(id); this.db.prepare("DELETE FROM users WHERE id=?").run(id); }
   close() { this.db.close(); }
 }

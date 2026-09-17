@@ -66,7 +66,10 @@ export class SeraClient {
           const nested = detail && typeof detail === "object" ? detail as Record<string, unknown> : {};
           const candidate = nested.error_code ?? nested.code ?? nested.error;
           const known = ["NO_LIQUIDITY", "AMOUNT_BELOW_MIN", "QUOTE_STALE", "SLIPPAGE_EXCEEDED"];
-          const code = typeof candidate === "string" ? candidate.toUpperCase() : "";
+          // The live quote endpoint also returns the documented legacy literal.
+          // Match only that exact 400 response; arbitrary provider text stays private.
+          const legacyNoLiquidity = path === "/swap/quote" && response.status === 400 && detail === "No liquidity";
+          const code = legacyNoLiquidity ? "NO_LIQUIDITY" : typeof candidate === "string" ? candidate.toUpperCase() : "";
           throw new AppError(known.includes(code) ? code : "UNAVAILABLE", response.status);
         }
         const parsed = schema.safeParse(data);

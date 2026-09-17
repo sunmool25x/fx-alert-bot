@@ -1,6 +1,7 @@
 import type { WalletProvider } from "./connection.js";
 import type { WalletChoice,TelegramEnvironment } from "./routing.js";
 export interface ConnectedProvider extends WalletProvider {
+  readonly claimSupported?:boolean;
   disconnect():Promise<void>;
   on(event:string,listener:(...args:any[])=>void):unknown;
 }
