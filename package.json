@@ -1,0 +1,41 @@
+{
+  "name": "sera-korea-fx-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dev:live": "node --use-system-ca --import tsx scripts/dev-live.ts",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "build": "tsc -p tsconfig.build.json && node scripts/build-web.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "sera:smoke": "tsx scripts/sera-smoke.ts",
+    "alerts:smoke": "tsx scripts/alerts-smoke.ts",
+    "scanner:smoke": "tsx scripts/scanner-smoke.ts",
+    "wallet:smoke": "tsx scripts/wallet-smoke.ts",
+    "wallet:preflight": "node --use-system-ca --import tsx scripts/wallet-preflight.ts",
+    "funding:smoke": "tsx scripts/funding-smoke.ts"
+  },
+  "dependencies": {
+    "@grammyjs/auto-retry": "2.0.2",
+    "@okxconnect/universal-provider": "1.9.1",
+    "@reown/appkit": "1.8.24",
+    "@reown/appkit-ui": "1.8.24",
+    "@walletconnect/ethereum-provider": "2.25.0",
+    "decimal.js": "10.6.0",
+    "grammy": "1.46.0",
+    "viem": "2.56.5",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.5",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2"
+  }
+}

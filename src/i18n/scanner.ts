@@ -1,0 +1,46 @@
+import type { Language } from "../database/store.js";
+export const scannerMessages = {
+  ko: {
+    title: "🔎 지금 확인해볼 FX 조건", scope: "최근 확인한 시장 조건", checked: "마지막 확인", size: "확인한 규모",
+    hour: "시간", movement: "변동", threshold: "표시 기준", baseline: "비교 시각", reason: "감지 이유",
+    quote: "최신 Quote 확인", alert: "알림 설정", markets: "시장 보기", allMarkets: "전체 시장 보기", newAlert: "알림 만들기",
+    available: "최근 확인 시 이 규모로 유효한 Quote를 받을 수 있었습니다.", recovery: "Quote 재개 확인",
+    empty: "지금은 설정된 기준에서 특별히 표시할 FX 조건이 없어요.\n\n원하는 환율이나 움직임을 기다리고 있다면 알림을 만들어두세요.",
+    WARMING: "첫 시장 데이터를 확인하고 있어요. 잠시 후 /alpha로 다시 확인해 주세요.",
+    STALE: "최근 데이터를 확인하지 못해 오래된 결과는 표시하지 않았어요. 잠시 후 다시 확인해 주세요.",
+    UNAVAILABLE: "일부 시장 데이터를 가져오지 못했습니다. 확인된 데이터만 표시합니다.",
+    NO_QUOTES: "확인한 금액으로는 현재 표시할 유효한 Quote가 없어요.",
+    DISABLED: "FX 조건 탐색이 꺼져 있거나 Sepolia 테스트넷이 아닙니다.",
+    partial: "최근 상태를 확인하지 못한 일부 시장은 표시하지 않았어요.",
+    history: "일부 기간은 환율 변동을 비교할 데이터가 아직 충분하지 않습니다.",
+    note: "설정된 페어와 금액을 확인한 결과이며, 전체 시장을 다루지는 않습니다. 금액별 Quote 환율에는 비용이 반영됩니다. 과거 확인 결과이므로 Quote가 만료될 수 있습니다. 총 유동성이나 내 지갑의 거래 가능 여부를 뜻하지 않습니다. 최신 Quote로 다시 확인해 주세요.",
+    refreshed: "시장 상황이 변했을 수 있어 최신 Quote를 다시 조회했습니다.", refreshedAt: "새 Quote 조회 시각",
+    reasons: {
+      MOVEMENT_THRESHOLD: "해당 기간의 Quote 환율 변동폭이 설정된 표시 기준에 도달했습니다.",
+      POSITIVE_QUOTE: "지정한 규모에서 최소 수령액이 0보다 큰 유효한 Quote가 확인되었습니다.",
+      QUOTE_RETURNED: "이 규모의 Quote가 없던 상태에서 다시 확인되었습니다.",
+    },
+  },
+  en: {
+    title: "🔎 FX conditions to check now", scope: "Recently checked samples", checked: "Last checked", size: "Sampled amount",
+    hour: "h", movement: "movement", threshold: "Display threshold", baseline: "Baseline time", reason: "Why shown",
+    quote: "Check latest quote", alert: "Set alert", markets: "Markets", allMarkets: "All markets", newAlert: "Create alert",
+    available: "The latest check returned a valid quote at this size.", recovery: "Quote returned at",
+    empty: "No FX conditions meet the current display criteria.\n\nWaiting for a rate or market movement? Create a personal alert.",
+    WARMING: "We're checking the first market data. Try /alpha again shortly.",
+    STALE: "Recent data could not be checked, so older results are hidden. Please try again shortly.",
+    UNAVAILABLE: "Some market data could not be fetched. Only verified observations are shown.",
+    NO_QUOTES: "No valid quotes are currently available to show at the checked sizes.",
+    DISABLED: "FX discovery is disabled or the network is not Sepolia testnet.",
+    partial: "Some markets are hidden because their recent conditions could not be checked.",
+    history: "Some time windows do not yet have enough observation history for comparison.",
+    note: "These are configured pairs and amounts, not the entire market. Amount-specific rates include quoted costs. These are past checks; quotes can expire. They do not represent total liquidity or guarantee execution for your wallet. Request a fresh quote.",
+    refreshed: "Conditions may have changed. A fresh quote has been requested.", refreshedAt: "New quote fetched at",
+    reasons: {
+      MOVEMENT_THRESHOLD: "The quoted-rate movement over this window reached the configured display threshold.",
+      POSITIVE_QUOTE: "A valid quote with positive minimum received amount was found at this size.",
+      QUOTE_RETURNED: "A quote at this size returned after observed unavailability.",
+    },
+  },
+} as const;
+export const st = (language: Language) => scannerMessages[language];
