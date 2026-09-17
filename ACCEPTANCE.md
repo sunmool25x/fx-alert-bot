@@ -1,6 +1,6 @@
 # FX Alert Bot — Owner acceptance checklist
 
-Start with [README: Start Live Testing](README.md#start-live-testing). The owner reports Telegram, Mini App opening and Reown Project ID setup are working. Keep those settings. The launcher manages the tunnel/origin and rebuilds source changes on new launches. Mark a box only after **you perform that check**. Automated tests and public probes are recorded separately in [STATUS.md](STATUS.md); they do not complete phone tests.
+Start with [README: Start Live Testing](README.md#start-live-testing). Telegram mobile Mini App launch, official OKX Web3 handoff, connection and backend ownership verification have been successfully tested. MetaMask, Telegram Desktop, real swap submission and settlement remain unverified. Preserve existing private credentials. The launcher manages the tunnel/origin and rebuilds source changes on new launches. Mark a box only after **you perform that check**. Automated tests and public probes are recorded separately in [STATUS.md](STATUS.md); they do not complete phone tests.
 
 ## Current scope — Phase 6
 
@@ -113,12 +113,12 @@ One `npm run dev:live` performs all four checks below. You do not need separate 
 - [ ] **Ownership signature works.** How to test: read the ownership-only message (origin, Sepolia, purpose, expiry), approve it yourself, and check `OWNERSHIP_VERIFIED`. This is not token-use or trade authorization.
 - [ ] **Wallet app return works.** How to test: on mobile, approve ownership, return to Telegram and check the verified address. `WALLET_RETURNED` records visibility only; it does not substitute for successful backend verification. Mark N/A with reason if no app switch was involved.
 - [ ] **`/wallet` address correct.** How to test: compare its full address with the wallet app. Only one linked EOA should appear. Smart/delegated wallets must fail cleanly if tried; no alternative signing path is supported.
-- [ ] **`/balance` correct.** How to test: compare the actual wallet USDC/XSGD balances with the exact contract addresses in README. Zero is valid before funding. There must be no fictitious Vault balance. An RPC failure must show a safe error, not a zero balance.
+- [ ] **`/balance` correct.** How to test: compare the actual wallet USDC/XSGD balances with the exact contract addresses in [supported test tokens](#obtain-the-exact-supported-test-tokens). Zero is valid before funding. There must be no fictitious Vault balance. An RPC failure must show a safe error, not a zero balance.
 - [ ] **Disconnect invalidates the session.** How to test: disconnect, try balance/old preparation and require wallet verification again. Reconnect before proceeding. A previous ownership challenge cannot be reused; protocol replay rejection is also covered by automated tests.
 
 ## E. Trade Preparation
 
-- [ ] **Supported test funds available.** How to test: follow README's test-token section and personally claim the official faucet tokens if needed. Confirm receipt success and a positive exact-contract USDC wallet balance. Public stock/simulation checks do not mark this box complete.
+- [ ] **Supported test funds available.** How to test: follow [supported test tokens](#obtain-the-exact-supported-test-tokens) and personally claim the official faucet tokens if needed. Confirm receipt success and a positive exact-contract USDC wallet balance. Public stock/simulation checks do not mark this box complete.
 - [ ] **Fresh wallet-specific quote.** How to test: with execution OFF and verified wallet, start USDC → XSGD preparation, then press the Mini App's fresh quote button. Try 5 test USDC only if live liquidity supports it; never exceed the configured ceiling. Check there are no financial consent buttons.
 - [ ] **Review terms correct.** How to test: compare Sepolia, input, same-wallet recipient, minimum output, rate, costs/unknown-cost explanation and actual expiry. The output is a protocol minimum, not a guaranteed price or independently estimated fill. Two future financial approvals must be explained before execution is enabled.
 - [ ] **Expiry handled.** How to test: leave a read-only preview until its displayed expiry/safety cutoff. Require an expired/new-review message, then explicitly request a fresh quote. No automatic refresh or signing.
@@ -173,3 +173,260 @@ Phase 6. All boxes below require the owner's actual Telegram checks; automated f
 - [ ] Today/7/30 days, Sources and Funnel are understandable; no private user/wallet/auth data is visible. Check saved English preference separately if used.
 
 Keep execution and mainnet OFF. Completion must stay zero unless an already authorized transaction has independently reached the established verified settlement state; this phase does not authorize such a transaction. Stop before Phase 7.
+
+## Configuration and runtime reference
+
+Detailed setup and operating instructions formerly embedded in README. Existing acceptance checkboxes remain separate regression checks; successful mobile connection does not complete every safety/UX case. Keep execution and mainnet OFF.
+
+## Telegram runtime
+Use the single launcher above and your own BotFather setup.
+
+The MVP uses long polling and one process per token. An existing webhook causes startup to fail; the bot does not remove webhooks or drop pending updates. A webhook deployment requires a separately implemented authenticated endpoint.
+
+Acquisition deep links: https://t.me/world_fx_alert_bot?start=community_a and https://t.me/world_fx_alert_bot?start=telegram_group_a.
+First valid touch is immutable; latest touch may update. Sources are lowercase ASCII letters/digits/underscore/hyphen, maximum 48 characters; invalid payloads become unknown and no payload means direct. Existing legacy first source is preserved. This is attribution only, with no referral rewards. See [Growth analytics](GROWTH_ANALYTICS.md).
+
+## Recommended BotFather metadata
+
+These are copy recommendations for the owner to apply manually. Apply these recommendations manually in BotFather. The copy is kept conservatively short; no unverified field limit is assumed.
+
+**Username:** `@world_fx_alert_bot`
+**Name:** `FX Alert Bot`
+
+**Short description / About — Korean**
+
+> 환율을 확인하고 원하는 FX 조건이 오면 Telegram으로 알려주는 FX 모니터링 봇.
+
+**Short description / About — English**
+
+> Monitor FX markets, set personal rate alerts, and check fresh quotes from Telegram.
+
+**Description — Korean**
+
+> FX 시장을 확인하고 목표 환율·시장 움직임·거래 가능 조건을 알림으로 받아보세요.
+>
+> 자동 거래 없이, 알림 → 최신 Quote → 직접 확인하는 방식으로 동작합니다.
+>
+> Powered by Sera Protocol.
+
+**Description — English**
+
+> Explore FX markets and get alerts for target rates, market movements and quoted trade sizes.
+>
+> Alert → fresh quote → your review. No automatic trading.
+>
+> Powered by Sera Protocol.
+
+Keep the short text in the compact About/short-description field and the longer text in Description. Command descriptions are defined locally in `src/index.ts`; the existing startup registration behavior is unchanged. A running process needs a normal restart to load the new bot copy; do not run a second polling process for the same token.
+
+## Environment
+| Variable | Default | Meaning |
+|---|---|---|
+| TELEGRAM_BOT_TOKEN | empty | Required for live Telegram; not needed for API smoke or tests |
+| SERA_REFERRAL_URL | empty | Optional owner-supplied attribution URL, reserved for documentation/footer use; no runtime referral UI or transaction attribution change |
+| SERA_NETWORK | sepolia | Sepolia only; mainnet is rejected |
+| ENABLE_MAINNET | false | Must remain false; true is rejected |
+| ENABLE_TESTNET_EXECUTION | false | Owner-controlled Sepolia switch; also requires setup and per-user allowlist |
+| DATABASE_PATH | ./data/bot.sqlite | SQLite file; automatically initialized |
+| SERA_REQUEST_INTERVAL_MS | 500 | Minimum API request-start spacing, at least 250 ms |
+| SERA_TIMEOUT_MS | 15000 | Request timeout, bounded to 30 seconds |
+| SERA_RETRIES | 2 | GET retries for 429/503; no quote POST retries |
+| SERA_MAX_RETRY_WAIT_MS | 2000 | Maximum inline retry wait; longer server delays fail promptly and block subsequent requests until Retry-After |
+| SERA_RATE_CACHE_MS | 10000 | Reference FX cache; source timestamp remains visible |
+| SERA_REFERENCE_MAX_AGE_SECONDS | 900 | Stale reference warning |
+| LIQUIDITY_PROBE_SIZES | 100,1000,10000 | Up to five source-token sizes, not dollar notionals |
+| CONVERSATION_TTL_SECONDS | 900 | Wizard and refresh-intent TTL |
+| MARKET_POLL_INTERVAL_SECONDS | 60 | Delay after a monitoring cycle finishes; minimum 60, maximum 3600 |
+| MARKET_POLL_INTERVAL_MS | unset | Legacy fallback (60000–3600000); explicit seconds setting takes precedence |
+| ALERT_COOLDOWN_SECONDS | 3600 | Per-alert minimum time between triggers; minimum 60 |
+| ALERT_MAX_GROUPS_PER_CYCLE | 10 | Maximum unique pair/direction/amount probes per cycle; maximum 20 |
+| ALERT_MAX_PER_USER | 20 | Maximum saved alerts per user |
+| ALERT_MAX_TOTAL | 500 | Maximum saved alerts for this single instance |
+| ALERT_BASELINE_TOLERANCE_SECONDS | 300 | Historical sample tolerance, further capped at 10% of the requested window |
+| ALERT_OBSERVATION_RETENTION_HOURS | 72 | Shared observation retention; minimum 26 hours to cover the 24h window |
+| ALERT_NOTIFICATION_TTL_SECONDS | 900 | Expire undelivered notifications after this age |
+| ALPHA_ENABLED | true | Add configured discovery probes to the existing monitor; false disables /alpha and its background jobs |
+| ALPHA_PROBES | USDC/XSGD:100,USDC/EURC:100,XIDR/USDT:1000000 | Directed pair:source-token-amount entries; 1–12, no duplicates; symbols/pairs and token precision/minimum are checked against the live registry |
+| ALPHA_MAX_RESULTS | 12 | Maximum distinct directed pairs in a feed; 1–12; pages show 3 cards |
+| ALPHA_DATA_MAX_AGE_SECONDS | 180 | Maximum age of a displayed observation; 30–900; also maximum gap between samples establishing recovery |
+| ALPHA_MOVEMENT_1H_PCT | 0.5 | Absolute 1-hour movement display threshold (%) |
+| ALPHA_MOVEMENT_6H_PCT | 1 | Absolute 6-hour movement display threshold (%) |
+| ALPHA_MOVEMENT_24H_PCT | 2 | Absolute 24-hour movement display threshold (%) |
+| ALPHA_RECOVERY_MAX_AGE_SECONDS | 900 | Recovery visibility window, 60–86400 seconds; current observation must independently be fresh |
+
+Scanner movement thresholds must be positive plain decimals ≤100. The defaults are conservative display filters, not recommended trading thresholds. Probe amounts are token units, not comparable dollar notionals. Change .env and restart to apply settings. No probe is automatically resized when it violates a token minimum.
+
+No Sera API key or private key is needed for these read-only features. Later account functions require wallet-specific authorization; an operator's Sera credentials must never be reused for every Telegram user.
+
+## Database and privacy
+On startup the version 1 migration creates users, conversations, quote_intents and schema_migrations. Version 2 adds alerts, market_observations, alert_triggers and delivery_outbox. Version 3 adds scanner_probes: at most 12 configured public probe summaries, with resolved pair/amount, last attempt/error, last observed availability/time and recovery time. Existing records are preserved. Back up an existing database before the first upgraded startup.
+Stored information: Telegram operational user ID, language, existing first source, created/last-seen timestamps, expiring token selections, amount/pair settings, alert conditions, evaluation state, cooldown and trigger/delivery history. Scanner summaries contain no user IDs or personal thresholds. They reuse market_observations for history and quote_intents for user-owned result buttons. Migration 6 adds local aggregate analytics and normalized attribution; see [Growth analytics](GROWTH_ANALYTICS.md).
+No usernames, personal names, phone numbers, location, message history, raw private keys, signatures or Sera API secrets are stored.
+Telegram still stores chat messages. /forget requires a fresh confirmation and deletes the user's stored bot records, including conversations, quote intents, alerts, triggers, terminal trade records and pending deliveries. It is blocked while a submitted/unknown trade still needs reconciliation; disconnect remains available. /deletealert also cancels dependent pending deliveries. A send already in flight cannot be recalled. Financial migration and backup evidence are documented in [STATUS.md](STATUS.md#11-database-and-secrets).
+Market observations are shared and contain no Telegram IDs. The monitor prunes them after 72 hours by default and removes terminal trigger/delivery history after 30 days. Active alerts remain until deleted. Failed/expired delivery status is visible in /alerts. Logs contain random operational record IDs; restrict access and rotate logs at the host.
+Expired conversations are removed on access; expired quote intents are removed when new ones are saved. Stored quote-button intentions are not executed and have separate TTLs from live quote expiry.
+Restrict data-directory permissions. Use SQLite's online backup tool or stop the process before copying the database; an active WAL database must not be backed up by copying only its main file.
+
+## Testing Alerts Locally
+1. Open PowerShell and run `cd fx-alert-bot`. Install Node 24 first if necessary. Run `npm ci`. Keep your existing `.env`; if absent, run `Copy-Item .env.example .env`. Edit only this project's `.env` and put your own BotFather token in `TELEGRAM_BOT_TOKEN`. Keep `SERA_NETWORK=sepolia`, `ENABLE_MAINNET=false` and `ENABLE_TESTNET_EXECUTION=false`.
+2. Keep `MARKET_POLL_INTERVAL_SECONDS=60`. For a shorter testing cooldown you may set `ALERT_COOLDOWN_SECONDS=60` (normal default: 3600). Run `npm run build`, then `npm start`, and leave that terminal open. If HTTPS fails on this Windows machine, run `$env:NODE_OPTIONS='--use-system-ca'` before startup; never disable certificate verification. Existing databases upgrade automatically; no SQL commands are needed.
+3. Open your bot in a **private** Telegram chat. Send `/start`, then `/alert`. Select **USDC → XSGD**, **목표 환율 이상**, then enter **100**. This pair had quotes during testing; current testnet liquidity may differ. The bot shows the current amount-specific rate before asking for the target.
+4. Choose a target slightly **above** that live rate so the condition starts unmet. For example, if the screen shows `1 USDC = 1.2500 XSGD`, try `1.2501` or about 0.01% higher. These are illustrative numbers, not live prices. For **목표 환율 이하**, choose a slightly lower target. Check the final pair, amount, direction and target; press **알림 만들기**. If the preview is already beyond your target, cancel and choose a new target. An already-met condition will not send an immediate notification.
+5. Send `/alerts`. Check the saved condition, last check time and state. **최신 상태** checks the current quote without changing trigger state. Keep the bot running. A push requires a real observed crossing; prices may not cross during the test, and polling can miss brief movements. Creating an already-satisfied alert is not a shortcut to a trigger.
+6. When **🔔 설정한 FX 조건에 도달했어요** arrives, check the reason and `1 BASE = X QUOTE` direction. Press **최신 Quote 확인**, then press it again. Each press makes a new Sera request; the new fetch time/expiry should update even if the rate stays identical. The response includes **알림이 발생한 이후 시장 상황이 변했을 수 있어 최신 Quote를 다시 조회했습니다.** No signature prompt or trade execution should appear. Before a crossing, the same retrieval can be checked through `/alerts` → **최신 상태** → **최신 Quote 확인**.
+7. Send `/deletealert` (or `/alerts`), press the desired alert's **삭제**, and confirm. Run `/alerts` again. The deleted alert is gone and old alert-specific buttons no longer work. Existing independent Phase 1 quote-refresh intents expire normally.
+8. Use `/language` → **English** and repeat setup/list/delete to check English. Stop with Ctrl+C and restart with `npm start`; language and active alerts persist. Movement alerts need actual 1/6/24-hour history before evaluation. Size/recovery alerts need an observed no-quote → valid-quote transition.
+9. Inspect the startup terminal for JSON events: `monitor_cycle`, `alert_triggered` (reason and timestamp), `alert_delivered`, `alert_delivery_failed`, `market_observation_failed`. For a saved local log, use `npm start 2>&1 | Tee-Object -FilePath bot.log`. Docker users can run `docker compose logs -f`. Logs do not include private keys, token URLs, message text or raw API responses.
+
+For deterministic crossing/error/restart testing without waiting for a market move, run `npm test`; it mocks both external services. For real Sera reads without a Telegram token run `npm run alerts:smoke` (on this Windows machine: `node --use-system-ca --import tsx scripts/alerts-smoke.ts`). The smoke script uses synthetic users in an in-memory database and cannot send Telegram messages. Neither is a claim of live Telegram acceptance.
+
+## Testing `/alpha` Locally
+
+1. Open the project in PowerShell: `cd fx-alert-bot`. Keep the existing .env and database. Set your dedicated BotFather token locally if it is not configured. Do not paste it into chat.
+2. Keep SERA_NETWORK=sepolia, ENABLE_MAINNET=false and ENABLE_TESTNET_EXECUTION=false. The defaults in .env.example enable ALPHA_ENABLED=true and the three sample pairs. Existing .env files inherit these defaults without being overwritten.
+3. Run npm ci, npm run build, then npm start. On this Windows machine, set $env:NODE_OPTIONS='--use-system-ca' first if HTTPS certificate verification fails. Leave the terminal running.
+4. In your bot's private Telegram chat, send /start, then /alpha. If it is still collecting data, wait about 60–90 seconds and try again. Two of the default samples had quotes in the live check; future testnet availability may differ. An empty or partial result is valid behavior.
+5. Check each card's direction, amount, reason and last-check timestamp. Fresh quote-availability cards need no long history. Leave the process running for 1/6/24 hours to build movement history. Do not expect movement or recovery to appear unless real observations meet the criteria.
+6. Press a numbered **최신 Quote 확인** button twice. Check the new retrieval time and expiry; the rate may stay the same. You should see the market-change sentence, with no trade/signature button.
+7. Return to /alpha and press **알림 설정**. For movement, enter your own percentage and choose a window. Review the pair, amount and condition, then press **알림 만들기**. Verify it with /alerts. Before confirmation, no subscription should exist. Manage or delete it through the existing commands.
+8. Press **시장 보기** to open the existing markets list. If more than three distinct pairs qualify, use 이전/다음; the feed intentionally sends one message per page. Switch /language to English and repeat.
+9. For a restart check, stop with Ctrl+C and start again. Existing alerts, language and scanner summaries persist; old scanner samples expire normally. After downtime, history gaps are not fabricated into a recovery.
+10. Watch terminal JSON logs: monitor_cycle, scanner_catalog_failed, scanner_probe_invalid and market_observation_failed. Use npm start 2>&1 | Tee-Object -FilePath bot.log to keep a local log. /alpha reads should not generate new monitor cycles or quote probes.
+
+For deterministic threshold/ranking/error tests without waiting on real prices, run npm test. For a small real Sera check without Telegram credentials, run npm run scanner:smoke (on this Windows machine: node --use-system-ca --import tsx scripts/scanner-smoke.ts). It uses an in-memory database, never fabricates history and sends no Telegram messages. Mocked tests and this read-only smoke do **not** constitute live Telegram acceptance.
+
+## Deploy
+Use one persistent Node 24 process on a VPS/container with a persistent writable data volume and platform-managed secret injection.
+Run npm ci, npm run build, npm start under a process supervisor with graceful SIGTERM. Keep outbound HTTPS access to Telegram and Sera available.
+A [Dockerfile](Dockerfile) and [compose.yaml](compose.yaml) provide a single polling-instance recipe. Set your token in .env then:
+```bash
+docker compose up --build -d
+docker compose logs -f
+```
+The named volume preserves SQLite and the container runs as the node user. Docker recipes require local deployment validation; do not claim they are deployed.
+Do not use ephemeral serverless storage for SQLite or run multiple replicas against this polling token. PostgreSQL/shared worker leases and budget coordination come before horizontal scaling.
+No cloud resources, public endpoint, Telegram webhook or production deployment is created by this repository.
+
+## Live acceptance setup
+
+Use [README quick setup](README.md#install). The following is the detailed runbook; none of it authorizes enabling execution during documentation work.
+
+### Launcher behavior
+
+`dev:live` preserves `.env`. It runs the test/typecheck/build gates, finds cloudflared on PATH/in Downloads, or downloads the official Windows executable into ignored `.dev-live/bin` and verifies GitHub's SHA-256 release digest. Optional `CLOUDFLARED_PATH` selects an existing executable; normally leave it unset.
+
+A 503 bootstrap listener reserves the local signing port while Cloudflare obtains a URL. The launcher then replaces it with the real app using that URL. Telegram starts only with the real origin. The app listens on 127.0.0.1:8787, or configured SIGNING_PORT. No bootstrap page authenticates or performs wallet actions.
+
+The origin, launcher PID and port are stored in ignored `.dev-live/session.json`, with no credentials. The old temporary SIGNING_ORIGIN in `.env` remains untouched but is overridden at runtime. `wallet:preflight` automatically uses the active launcher. Normal shutdown removes its state/lock; dead-process state is ignored/recovered. Temporary URLs are never committed.
+
+Cloudflare receives only a minimal system/network environment, not bot credentials. Its separate generated config leaves the user's `~/.cloudflared` files untouched. Protocol selection is **auto**: forced HTTP/2 failed on this connection; automatic selection registered the edge and passed public HTTPS. Debug/header logging and self-updates are disabled. [Quick Tunnel documentation](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/).
+
+Only spawned children are managed. Interactive Ctrl+C drains the bot through private process IPC and closes the tunnel. Unrelated processes are never killed by name. The HTTP server has no shutdown or authentication-bypass endpoint. A second launcher is blocked by a repository-local lock.
+
+### Readiness and developer troubleshooting
+
+The owner command shows one compact checklist. A missing Reown ID is an owner gate, not a broken signing server. Detailed diagnostics remain available with `npm run wallet:preflight`, using the system CA store automatically. Execution-OFF WARN is expected; `--offline` does not satisfy live acceptance.
+
+Developer-only `npm run dev:live -- --check` runs startup/probes and then closes its children. It returns nonzero for missing prerequisites. Normal `dev:live` stays open and reloads after a saved Project ID. Do not run another polling instance for the same bot token.
+
+| Result | Action |
+|---|---|
+| REOWN_PROJECT — HUMAN ACTION REQUIRED | Owner creates a dedicated development project and saves its Project ID once |
+| HTTPS_ORIGIN / HTTPS_READ / WEB_BUILD / DATABASE — AUTO-FIXABLE | The launcher starts/builds/checks these; report the code if its bounded checks still fail |
+| TUNNEL_NETWORK / TUNNEL_TLS / TUNNEL_CONNECT | Safe connection diagnostics; do not disable TLS. Service/network failures can still block a tunnel |
+| CLOUDFLARED_DOWNLOAD | Retry with official GitHub downloads reachable; unverified binaries are not executed |
+| LIVE_RUNNING / PORT_BUSY | Use the existing launcher; a developer identifies any older manual process |
+| TESTS_FAILED / TYPECHECK_FAILED / BUILD_FAILED | Developer repairs the failing check before live startup |
+| TG_READ / RPC_READ / SERA_READ | Check the dedicated bot/provider/service without sharing credentials |
+
+When no launcher is running, preflight checks saved configuration; an expired manual origin may fail. `dev:live` obtains a fresh runtime origin automatically. A fresh developer checkout needs Node 24 and `npm install` once.
+
+Keep the configured Sepolia RPC. The verified public option is `https://ethereum-sepolia-rpc.publicnode.com`; no provider account is necessary to begin. Sera is selected internally at `https://api.testnet.sera.cx/api/v1`. No Sera operator API key, server signer or static session/encryption secret is needed.
+
+### Test Telegram, Mini App and wallet without financial authorization
+
+Follow ACCEPTANCE.md sections B–D: /start, /markets, /rate, /quote, /liquidity, /alpha, alert create/delete, /wallet, /balance and disabled /swap.
+
+The Mini App must show **조회 모드 · 거래 실행 꺼짐 / Read-only · Trading is off** (Korean by default) and the Telegram connection acknowledgement. Expand **연결 정보 / Connection details** to compare your own authenticated Telegram ID. The backend verified that identity. Disabled /swap offers quote preparation; its read-only preview has no financial confirmation/sign/submit buttons.
+
+Use a dedicated plain **EOA test wallet** in OKX Wallet or MetaMask. Choose Sepolia. Smart/delegated-code wallets are rejected. Press Connect Wallet and explicitly choose the wallet. Native Telegram mobile offers a selected-wallet continuation button; desktop offers a QR to scan inside that wallet. Approve only connection, return to the original Mini App, read the ownership explanation, then press **지갑에서 확인 / Verify in wallet**. If needed, use the selected-wallet button again to review the ownership request. No Permit/Intent appears during connection. Cancel/choose another wallet creates a fresh isolated attempt. On a wrong chain, select Sepolia in the wallet or use the existing switch action under connection details before ownership. No Telegram authentication credentials are carried in wallet/Telegram links. The Mini App supports Telegram light/dark themes and shows the full verified address on demand; balance reads do not replace the wallet card.
+
+Compare /wallet to your exact wallet address, then check /balance. These are actual wallet USDC/XSGD balances, including zero; no Vault balance is fabricated. Disconnect invalidates local unsubmitted authorizations, but cannot revoke allowances/signed permits or undo submitted swaps. A new Mini App session needs ownership verification again. Reloaded Telegram initialization may show AUTH_REPLAY; close and reopen with a fresh private-chat bot button.
+
+Telegram mobile + OKX connection and ownership verification were successfully tested. Telegram Desktop and MetaMask real-device flows remain unverified. Telegram Web's cross-site iframe/cookie behavior is not a supported acceptance claim; use a native client. A raw external-browser link is deliberately unauthenticated. WALLET_RETURNED only means the page became visible while a wallet request was pending; it does not prove a signature succeeded.
+
+### Obtain the exact supported test tokens
+
+The official [Sera quickstart](https://docs.testnet.sera.cx/quickstart/) links this [verified Sepolia faucet contract](https://sepolia.etherscan.io/address/0x4FAc3BB8B77547E2Da7ed903baDBeD2f46cBe65a#code), **IssueTestTokenV3**. Its public claim() function sends test assets to the calling wallet once per claim epoch. It is not admin-only. The official site also links [app.testnet.sera.cx](https://app.testnet.sera.cx/), whose wallet page requires sign-in for token claims; that signed-in path was not tested.
+
+**LIVE READ-ONLY CHECKED on 2026-09-17 KST:** the faucet list contains our exact USDC/XSGD and sufficient stock for its configured claim. A public-address eth_call simulation of claim() succeeded without changing chain state. This was not a token claim or a check of your eligibility. The current six-decimal-token allocation was 1,000,000,000 mock units each; the bot's 100-test-USDC maximum remains unchanged. Faucet stocks/allocations can change.
+
+To claim yourself:
+
+1. Use the same plain Sepolia test EOA. A **funding claim is a separate wallet-approved transaction** needing some native Sepolia ETH for gas. The bot's later relayed receive_less swap does not ask you to broadcast an ETH-funded swap.
+2. If needed, obtain free Sepolia ETH through the faucet linked by Sera's quickstart. Provider eligibility can differ. **Do not buy assets to pass a faucet gate.** If you cannot obtain gas or claim, stop and ask official Sera support through their site for test-funding assistance using your public address only.
+3. At the exact Etherscan address above, inspect **Contract → Read Contract**: getTokens, claimAmount and hasClaimed with your address. A true hasClaimed means another ordinary claim cannot be made in the current epoch.
+4. If eligible and funded for gas, choose **Contract → Write Contract → Connect to Web3** with that test EOA. Review and invoke **claim with no arguments** yourself. Do not select admin/reset functions or a different recipient. Confirm this funding transaction only in your wallet.
+5. After its receipt, use our /balance. Verify USDC at **0x965d4b4546716e416e950bc30467d128455d2d0e** and XSGD at **0x058e06ca2628165a6cd1e80e4dc82203dc0020aa**. Same-symbol tokens at other addresses cannot fund this flow; generic Circle test USDC is not assumed interchangeable.
+
+Insufficient faucet inventory can leave a pending claim. Check balances and seek Sera assistance instead of repeatedly claiming. No funding transaction was performed by the agent. To recheck stock without claiming:
+
+~~~powershell
+npm run funding:smoke
+~~~
+
+The single pair remains **USDC → XSGD**. A **5 USDC** probe returned a positive validated quote; a 1 USDC probe failed. Five is the smallest successful amount tested here, not a permanent protocol minimum or liquidity guarantee. Start the manual preview at 5. If unavailable, stop and report the code; the application will not resize it.
+
+### Complete the read-only execution gate
+
+With execution false, use /quote 5 USDC XSGD and continue into the Mini App. Connect/verify first, then press **내 지갑의 최신 Quote 확인**. This fetches a NEW wallet-specific quote with the same verified recipient and the same contract, balance, permit-metadata and amount checks. It returns display terms only, **no signable trade/version**.
+
+Check input, minimum received (not an invented expected output), rate direction, addresses, costs, expiry and the two future Permit/Intent approvals. Wait for expiry, then request a new preview. Quote life is about 30 seconds with a five-second safety cutoff; it is never extended.
+
+**Stop until YOU have verified all prerequisites:** tests, typecheck, build, full live preflight, real Telegram, authenticated Mini App, wallet connection/ownership, Sepolia, exact supported funds, correct /balance, a successful fresh wallet-specific preview and only your ID allowlisted. Record them in ACCEPTANCE.md. Any failed/unchecked prerequisite keeps execution OFF. Automated tests do not fill live boxes.
+
+### Future authorized test swap
+
+Financial authorization remains deferred. **dev:live cannot enable trading.** Only after the full owner gate passes in a later session may the owner explicitly authorize the existing execution workflow through the ordinary runtime (`npm start`), with a stable HTTPS origin and all safety gates satisfied. Keep execution false until that separately authorized session.
+
+Use /swap 5 USDC XSGD or an existing quote/alert/alpha continuation. Obtain a NEW wallet quote; the read-only preview cannot be promoted. Review its current exact terms and confirm. Explicitly approve the exact token-use Permit, then the Sera Intent, then submit **once**. Both financial requests are explained before they start and remain separate from ownership. Cancellation/expiry requires fresh review and signatures.
+
+Expect SUBMITTING, PENDING, CONFIRMED, FAILED or UNKNOWN. Telegram and Mini App **상태 새로 확인** invoke the same owner-scoped read-only reconciliation, respecting polling/backoff; they cannot submit. Only the matching SOR Intent event and finalized canonical successful receipt with valid token amounts produce completion, verified amounts, IDs, actual hash and explorer button. Finalization can take many minutes. Missing evidence remains unresolved, possibly indefinitely, without an automatic retry or timed release.
+
+After this single test, set execution false again and restart. Keep RPC configured to reconcile submissions. Disconnect cannot cancel submitted transactions. Do not delete an UNKNOWN row or reorg quarantine to force another attempt; report it for investigation. Stop the tunnel when you no longer need the Mini App.
+
+### Report failures safely
+
+**If a test fails, send the error code and the terminal log line to the developer.** Include checklist item, Telegram Desktop/Android/iOS version, wallet name and approximate time. Never include initData, cookies, request bodies, signatures, seed phrases, tokens or RPC connection strings. UI/provider errors omit raw stacks.
+
+| Code/check | Recovery |
+|---|---|
+| TG_CONFIG / TG_READ | Check the local token, polling/webhook compatibility and optional menu URL |
+| HTTPS_READ | Run dev:live to manage the bot/tunnel and refresh the runtime origin |
+| AUTH_INVALID / AUTH_STALE / AUTH_REPLAY | Reopen from a fresh private-chat bot button; check clock/HTTPS |
+| WALLET_CONNECT_CANCELLED | Retry with a fresh wallet selection; for OKX check supported app version/Web3 prompt, for MetaMask check Reown project/origin access |
+| OWNERSHIP_REJECTED | Press Connect again for a new ownership challenge |
+| NETWORK_MISMATCH | Explicitly switch to Sepolia and reconnect/verify |
+| EOA_REQUIRED | Use a plain EOA; smart/delegated wallets are unsupported |
+| RPC_UNAVAILABLE / RPC_READ | Check Sepolia RPC and retry reads later |
+| INSUFFICIENT_BALANCE | Check exact token address and official funding; do not buy assets |
+| NO_LIQUIDITY / UNAVAILABLE | Stop and report; no silent pair/amount changes |
+| QUOTE_STALE | Fetch/review new terms, confirm again and obtain new signatures |
+| PERMIT_REJECTED / INTENT_REJECTED | Cancelled authorization was not submitted; start with a new quote |
+| SUBMISSION_UNKNOWN / UNKNOWN | Refresh reads only; no second submission |
+| WALLET_BUSY | Resolve prior trade/quarantine; do not delete its lock |
+
+Safe diagnostic lines contain timestamp, allowlisted operation/code and process-local pseudonymous user/wallet references. No raw user ID, wallet address, session credential or financial signature is logged. Client visibility events are diagnostics, not analytics or authorization. Protect database/log access. /forget leaves backups untouched and is blocked while a submitted trade is unresolved.
+
+### Settings retained for acceptance
+
+| Setting | Default / purpose |
+|---|---|
+| SIGNING_PORT | 8787; loopback only |
+| WALLET_SESSION_SECONDS | 900; range 300–1800; Telegram initialization ≤5 minutes, ownership challenge 2 minutes |
+| SETTLEMENT_POLL_SECONDS | 60; range 30–300; two due records/cycle, 2,000 blocks/scan, unresolved backoff ≤5 minutes |
+| TEST_USDC_MAX_AMOUNT | 100; can be lowered, never raised past 100 |
+
+MIT and Haruki attribution remain intact. WalletConnect/Reown retain separate community licenses, network/branding requirements and installed commercial-license thresholds of 500 MAU or 2,500,000 monthly RPC calls. Full agreements ship in dist/web/THIRD_PARTY_LICENSES.txt and the signing page's license link. Review vendor terms before expanding.
+
+Mobile OKX connection and ownership proof are verified; this runbook does not establish full UX acceptance, a swap, settlement or production deployment. Keep execution OFF until every relevant acceptance gate passes in a separately authorized session.

@@ -1,6 +1,18 @@
 # Implementation status
 
-## Current — GitHub publication preparation, 2026-09-17 KST
+## Current — public README and verification status, 2026-09-17 KST
+
+Public original repository: [sunmool25x/fx-alert-bot](https://github.com/sunmool25x/fx-alert-bot). GitHub API verification confirms public visibility, `fork=false`, default branch `main`, the configured Sera description and all seven topics including `built-on-sera`. GitHub was connected to Sera Community according to the maintainer's update. The API showed zero stars/forks at this check; external qualification and daily XP sync remain pending/unverified. No +300 XP credit is claimed.
+
+**LIVE TESTED:** Sera read-only markets/rates/quotes; Telegram mobile Mini App launch; official OKX Web3 Wallet handoff and connection; successful backend ownership verification on mobile. **NOT YET LIVE VERIFIED:** MetaMask real-device connection, Telegram Desktop wallet flow, actual Sepolia swap submission and complete settlement. Mainnet and development execution remain OFF. Specific new ownership-tap/UX/recovery cases remain separate unchecked regression items in ACCEPTANCE.md; mobile connection success is not blanket wallet acceptance.
+
+README is a concise product landing page and quick setup guide. Detailed configuration, launcher, funding, deployment, recovery and acceptance instructions now live in ACCEPTANCE.md; API/alert/scanner/NLU reference is in RESEARCH.md; Telegram connector setup is in OKX_CONNECT.md. Growth definitions remain in GROWTH_ANALYTICS.md. No new docs file or fabricated screenshot is introduced. Publication-pending setup wording is removed from the current README; older reports below retain their historical context.
+
+This is documentation only. Hash verification confirms all **146 protected baseline files** remain unchanged: all non-Markdown tracked files and the private `.env`, including every existing test and all wallet/financial behavior. No execution switch, signature, transaction or new development phase is authorized by this update.
+
+Validation: README **634 → 311 lines**; **398/398 tests pass**, with no failures/skips/cancellations; typecheck and build pass. All **74 local Markdown links/anchors** pass, including references into relocated sections; the four unique external README links returned HTTP 200. Source, dependencies, license notices and `.env` were not edited. One meaningful documentation commit is pushed to the existing `main` remote after staged-tree and history secret checks; no history rewrite or extra contribution commits.
+
+## Historical — GitHub publication preparation, 2026-09-17 KST
 
 Prepared target **sunmool25x/fx-alert-bot**, a public original repository. Publication is pending the owner action; no remote writes have been made. The checkout began as a Git repository on master with no commits or remotes. A genuine clean initial commit on main is prepared after validation; no contribution history is fabricated.
 
@@ -242,7 +254,7 @@ These reads used a temporary public Sepolia RPC setting without writing it into 
 
 **BLOCKED — owner configuration/participation, not automated implementation.** Current preflight reports missing Telegram token, HTTPS signing origin, Reown project ID, configured Sepolia RPC, one-person allowlist and initialized migration-4 database. Public signing launch consequently cannot be verified. The signing build, execution/mainnet defaults and live Sera reads pass. Execution-OFF is an expected warning, not the reason for failure.
 
-The exact next action is: **open official @BotFather in Telegram and send `/newbot` for a dedicated development bot**. Keep its token local. Then follow the single [Windows setup guide](README.md#phase-45--live-acceptance-setup); it covers the optional menu button, temporary HTTPS tunnel, Reown allowlist, public RPC and obtaining the owner's numeric ID through this bot's `/wallet`.
+The exact next action was: **open official @BotFather in Telegram and send `/newbot` for a dedicated development bot**. Keep its token local. The relocated [Windows setup guide](ACCEPTANCE.md#live-acceptance-setup) covers the temporary HTTPS tunnel, Reown allowlist, public RPC and obtaining the numeric ID through this bot's `/wallet`.
 
 Only after tests/typecheck/build/full preflight and all real read-only Telegram, Mini App, wallet, Sepolia, token/balance, wallet-specific quote and sole-tester checks pass may the owner personally enable the existing execution flag. [ACCEPTANCE.md](ACCEPTANCE.md) contains the A–H checklist; no live boxes have been prechecked. A free-gas/faucet eligibility failure keeps execution OFF and requires official Sera assistance, not asset purchases or a silent pair switch. Native mobile completion inside the short quote window and unresolved settlement remain practical uncertainties. No deployment/tunnel/account setup or wallet approval is delegated to the agent.
 
@@ -410,7 +422,7 @@ No live Telegram bot/chat/alert delivery, Mini App authenticated session, Wallet
 
 ## 17. Exact owner setup and testing
 
-Follow [README — Phase 4 owner guide](README.md#phase-4-owner-guide), including its HTTPS reverse-proxy example, BotFather/Reown configuration, environment table, funding limitation, 15-step manual acceptance sequence and rollback instructions.
+The original Phase 4 guide has been superseded by the [live acceptance runbook](ACCEPTANCE.md#live-acceptance-setup), including BotFather/Reown configuration, environment settings, funding, manual acceptance and execution rollback instructions.
 
 On this Windows computer:
 
@@ -598,7 +610,7 @@ There is no known blocker to the implemented read-only Phase 3 code. A dedicated
 
 ## 17. Manual Telegram testing
 
-See [README — Testing /alpha Locally](README.md#testing-alpha-locally) for the full owner-friendly checklist.
+See [Testing /alpha locally](ACCEPTANCE.md#testing-alpha-locally) for the relocated manual checklist.
 
 1. Keep the existing project .env and database; set your own BotFather token locally.
 2. Keep Sepolia, mainnet=false and execution=false; scanner defaults are enabled.

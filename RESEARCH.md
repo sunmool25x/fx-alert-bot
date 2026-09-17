@@ -33,7 +33,7 @@ The available browser's actual [Reown Dashboard](https://dashboard.reown.com/) s
 | **UNKNOWN — owner participation required** | Owner eligibility, current gas estimate, actual faucet transaction and received balances; signed-in app claim behavior; wallet connector authorization and mobile return. These must be checked by the owner in ACCEPTANCE.md. |
 | **UNAVAILABLE** | No unauthenticated token-claim control was exposed on the inspected app wallet page. No separately documented faucet REST endpoint was established or invented. This does not label the verified on-chain faucet unavailable. |
 
-The funding method is the official-linked contract's **no-argument `claim()`**, called by the owner from the same Sepolia EOA. It requires some native Sepolia ETH up front for gas; do not assume the faucet's later ETH transfer pays that transaction's initial cost. The official quickstart also links [sepoliafaucet.com](https://sepoliafaucet.com/) for native test ETH. No account eligibility or successful claim on that service was tested. If free ETH/claim access is unavailable, request official Sera test funding assistance using only the public address; do not buy assets or bypass restrictions. README I gives the owner steps. No automated claim method was added.
+The funding method is the official-linked contract's **no-argument `claim()`**, called by the owner from the same Sepolia EOA. It requires some native Sepolia ETH up front for gas; do not assume the faucet's later ETH transfer pays that transaction's initial cost. The official quickstart also links [sepoliafaucet.com](https://sepoliafaucet.com/) for native test ETH. No account eligibility or successful claim on that service was tested. If free ETH/claim access is unavailable, request official Sera test funding assistance using only the public address; do not buy assets or bypass restrictions. [ACCEPTANCE: supported test tokens](ACCEPTANCE.md#obtain-the-exact-supported-test-tokens) gives the manual steps. No automated claim method was added.
 
 The single acceptance pair remains **USDC → XSGD**:
 
@@ -303,3 +303,169 @@ Completed independently with the attributed precision adaptation described above
 - Docker: recipe included; unavailable local Docker means container runtime was not tested.
 - No financial transaction, mainnet read, signer invocation or public deployment was performed.
 See STATUS.md for release gates. Phase 2+ is intentionally not claimed complete by this first-task delivery.
+
+## Implementation reference
+
+The historical research above records evidence at its original dates. Current mobile verification and public repository status are summarized in [README](README.md#current-status) and [STATUS](STATUS.md); historical setup unknowns are not present-day blockers. The following technical reference was moved from the public README without changing calculations or runtime behavior.
+
+## Natural Language
+
+한국어 요청은 명령어와 같은 구조화된 동작으로 연결됩니다. 지원 코인과 페어는 현재 Sera 목록에서 확인합니다.
+
+- “USDC/XSGD 환율 알려줘” — 현재 참고 환율.
+- “100 USDC를 XSGD로 바꾸면 얼마 받아?” — 새로운 조회용 Quote.
+- “USDC/XSGD가 1.35 넘으면 알려줘” — 목표 이상 알림 초안. 모니터링 금액을 입력한 뒤 **알림 만들기**로 확인합니다.
+- “1.30 이하면 알려줘” — 직전 페어의 목표 이하 알림 초안.
+- “6시간 동안 0.5% 이상 움직이면 알려줘” — 직전 페어의 절대 변동폭 알림 초안. 1/6/24시간, 시간/hr/h, %/퍼/퍼센트를 지원합니다.
+- “지금 볼만한 FX 조건 있어?” / “내 알림 보여줘” — 기존 /alpha /alerts 화면.
+- “USDC 5개 XSGD로 바꾸고 싶어” — 새 Quote만 준비. 지갑 연결과 거래 승인은 기존 버튼/지갑 흐름에서 직접 진행합니다.
+
+Natural language is converted into the same deterministic actions as commands. It never independently connects a wallet, signs, prepares a financial authorization payload or submits a transaction. Execution and mainnet stay OFF. Rate alerts use the existing size-specific, cost-inclusive quoted rate, not the reference rate displayed by /rate. Because a monitoring amount is material to that calculation, the bot asks for it rather than guessing. The normal alert preview explains the interpretation and requires its existing user-owned, expiring confirmation button. No new alert calculation or scanner threshold is introduced.
+
+Implementation: src/nlu/parser.ts extracts a bounded set of intents/entities; src/nlu/context.ts retains only structured pair/pending fields in process memory for **5 minutes**, with a **1,000-entry cap**. Context is isolated per user, revalidated against the current registry, cleared by unrelated commands/buttons, unknown input and cancellation, and lost on restart. A completed pair query can establish a new context. Existing wizard/confirmation lifetimes are unchanged; use /cancel before leaving an active command or alert wizard. No raw conversation text is stored or logged by NLU. Token symbols are case-insensitive; amounts remain exact decimal strings and pass existing precision/minimum checks. Unsupported tokens, unlisted pairs, conflicting directions, invalid numbers and unsupported windows are rejected; uncertain requests get examples or a concise follow-up.
+
+**No LLM, external AI requests, new API key or new dependency.** English commands remain available; English natural-language interpretation is deferred. This is a narrow parser, not a general Korean conversational model. Destination-first phrasing, multiple requests, synonyms outside the documented set and alerts specifying every field in arbitrary word order may need commands or a clearer request.
+
+Quote/alert records carry command, button or natural_language input labels in separate foreign-key metadata tables. These labels do not replace existing quote/alert-trigger provenance or modify financial state. Labels follow the initiating wizard; a quote refresh is a new button action. Metadata cascades with record deletion and /forget. Phase 6 reuses these labels for local aggregate reporting; see [Growth analytics](GROWTH_ANALYTICS.md).
+
+See [Korean Natural Language acceptance](ACCEPTANCE.md#korean-natural-language) for phone checks. Automated/local browser checks do not establish real Telegram mobile acceptance.
+
+## Architecture
+TypeScript + grammY provide the Telegram interface; SQLite persists users, observations, alerts, outbox, wallet references and local analytics. The Telegram Mini App uses OKX Connect for OKX and Reown/WalletConnect for the MetaMask path.
+
+```mermaid
+flowchart TD
+  Telegram[Telegram bot / Korean intents] --> Adapter[Sera API adapter]
+  Monitor[Market monitor] --> Adapter
+  Adapter --> Observations[SQLite observations]
+  Observations --> Alerts[Alert engine / scanner]
+  Alerts --> Notification[Telegram alert / condition card]
+  Notification --> Fresh[Fresh quote request]
+  Fresh --> Adapter
+  Fresh --> MiniApp[Wallet Mini App: OKX Connect / Reown]
+  MiniApp --> Consent[Explicit review + external wallet authorization]
+  Consent --> Gated[Sepolia submission: execution DISABLED]
+  Gated --> Settlement[Settlement tracking]
+  Telegram --> Analytics[Local Growth analytics / owner stats]
+  Analytics --> DB[SQLite]
+```
+
+```text
+Telegram private chat -> grammY adapter -> BotController / AlertController
+                                             |                 |
+                                         MarketService     Store -> SQLite
+                                             ^                 ^
+Configurable loop -> shared quote observations -> evaluate -> atomic trigger/outbox
+                                                              |
+                                               Telegram notification sender
+                                                              |
+                                      latest-quote button -> NEW MarketService.quote
+```
+- src/bot: Telegram transport, conversational commands, safe text/buttons and quote cards.
+- src/sera: runtime schemas, exact amount conversion, allowlisted API client and market service; separate gated swap capability.
+- src/alerts: quote observations, exact condition evaluation, monitor, notification formatting and sanitized logs.
+- src/scanner: configured public probes, local signal evaluation, deterministic ranking and grouped result cards; uses the existing monitor.
+- src/database: versioned SQLite migrations, repository interfaces, conversations, alert state, history and delivery outbox.
+- src/i18n: Korean product wording, English, simple FX glossary.
+- src/config: validated environment and testnet-first policy.
+- src/utils: bounded cache, request queue/pacing and redacted errors.
+- tests: mocked Sera/Telegram flows, calculation/precision/error handling and database restart persistence.
+- scripts/sera-smoke.ts: live Sepolia read-only catalog/rate/quote probes.
+- scripts/alerts-smoke.ts: live grouped alert observation and fresh-button quote check; no Telegram transport.
+- scripts/scanner-smoke.ts: live public sample collection, local scanner reads and a fresh result-button quote; no Telegram transport.
+
+The bot, monitor and scanner coverage share one MarketService, Sera client and request queue. /alpha itself reads SQLite only. src/wallet handles identity, ownership, on-chain reads and the companion HTTP server; src/trades validates and orchestrates consent, submission and settlement; web/ is the external-wallet interface. Only the trade orchestrator receives the submission capability. Market, scanner and notification workers cannot sign or submit. There is no server-side signer. Phase 5 maps local Korean intent/entities to these same controllers. src/analytics adds best-effort local events, durable-state projection and aggregate owner reports; it has no signing/submission capability.
+
+Node 24's SQLite implementation is used without an extra native npm driver. Its API is still marked release candidate by Node; keep the runtime on the tested Node 24 line and validate upgrades. WAL/foreign keys/busy timeout are enabled. Async repository boundaries and portable fields leave room for a PostgreSQL adapter; PostgreSQL is not implemented yet.
+
+## Sera integration and testnet setup
+Official references: [testnet API](https://docs.testnet.sera.cx/api-reference/), [system data](https://docs.testnet.sera.cx/api-reference/endpoints/system/), [swap quotes](https://docs.sera.cx/api-reference/endpoints/swaps/), [agents](https://agents.sera.cx/).
+The bot calls https://api.testnet.sera.cx/api/v1 and validates chain_id and EIP-712 domain chainId against Sepolia 11155111.
+Protocol contract roles come from live configuration and are checked on-chain. The narrow execution token policy pins the verified Sepolia USDC and XSGD addresses. No arbitrary custom Sera API host or redirect is accepted.
+Public read endpoints used: GET /config, /tokens, /markets, /system/time, /health, /fx/rate; POST /swap/quote. Only the gated trade service may POST /swap with user signatures. On-chain reads use the configured Sepolia RPC.
+The official MCP's simulate approach uses a burn-address quote probe. This bot uses the same documented approach; it does not invent a REST simulate parameter.
+Probe quote route fields are checked against the requested pair, amount and probe address. Raw amounts use BigInt; rate calculations use decimal.js.
+Catalog metadata is cached with in-flight deduplication. Quotes are never cached.
+A HTTP 200 quote with zero minimum output is shown as unavailable.
+Fees are labeled only to the extent provided by Sera. Cost is already incorporated into receive_less output; gas is not subtracted again.
+No faucet, ETH or funded wallet is needed for these read-only probes.
+The [testnet app](https://testnet.sera.cx/) is the starting point for funded-wallet setup in Phase 4. Verify token addresses from the live registry; use test assets only.
+
+## Alert logic
+Every alert has a direction and a source-token amount. Its rate is **quoted minimum output / input**, shown as `1 BASE = X QUOTE`. This includes quoted costs in `receive_less` mode, so fee/gas changes can move the monitored rate. It is distinct from the currency reference shown by /rate. No external DEX or reference feed is used.
+
+| Type | Korean UI | Condition |
+|---|---|---|
+| RATE_ABOVE | 목표 환율 이상 | Quoted rate ≥ target |
+| RATE_BELOW | 목표 환율 이하 | Quoted rate ≤ target |
+| QUOTE_AVAILABLE | 거래 가능 규모 | A valid quote with positive minimum output returns for the chosen amount |
+| RATE_MOVEMENT | 환율 변동 | Absolute `(current / baseline - 1) × 100` ≥ threshold, over 1, 6 or 24 hours |
+| MARKET_RECOVERY | 거래 가능 조건 회복 | Quote unavailable at the chosen size → valid quote available |
+| Spread | Hidden | No verified native bid/ask data; reverse quotes or fee-inclusive rates cannot establish the requested spread |
+
+Size and recovery use the same quote-availability transition, with different explanations. They do not represent total depth, exchange-wide reopening or guaranteed execution for the user's wallet. A documented HTTP 400 `NO_LIQUIDITY` or a valid zero-output response means unavailable. Timeouts, 429/5xx, malformed/stale/mismatched quotes, minimum-size and unsupported-pair errors mean **unknown**, and never trigger or rearm an alert.
+
+Movement history comes only from actual stored observations of the **same direction and amount**. Select the sample nearest `current observation time - requested window`, within ±300 seconds by default (also capped at 10% of the window). No interpolation or invented history. Insufficient history leaves the alert active and waiting. Messages show measured movement, baseline rate and actual baseline timestamp. Polling gaps, downtime or high load can leave no sample within tolerance; the alert waits again. Keep the host clock synchronized.
+
+The first valid sample primes state without notification. A fresh setup preview can serve as that first sample only if it is at most 30 seconds old and still valid when saved. A known false → true crossing creates one trigger; remaining true never repeats. A false sample rearms. Default cooldown is one hour per alert. Crossings inside cooldown are consumed: expiry alone never sends a delayed trigger; another false → true crossing is required. Unknown data preserves the last valid condition. Identical saved conditions per user are idempotent.
+
+## Background monitor and delivery
+One non-overlapping loop starts when Telegram polling starts. Default delay is 60 seconds **after** each cycle. It groups personal alerts and configured scanner probes by Sepolia + token addresses + direction + canonical amount, obtains one new quote per group, and shares the observation with every matching consumer. Scanner probes collect even before anyone creates an alert. No active alerts plus a disabled scanner means no market requests. Metadata caches and the existing paced client are shared with interactive commands. Quotes are never cached for reuse by a fresh-quote button.
+
+At most 10 groups are probed per cycle, with a 25-second soft polling budget checked between groups. Oldest-evaluated groups rotate first, including across restarts. Large numbers of distinct sizes increase each alert's effective interval; this is not a real-time feed. API requests retain 500ms default minimum spacing, timeouts, bounded GET retries and shared 429/503 Retry-After handling. Numeric Sera quotas remain unconfirmed; validate capacity with Sera before scaling.
+
+State change, trigger reason/time and outbox insertion commit in one SQLite transaction. A persisted sequence plus unique constraints prevents duplicate triggers. The delivery worker attempts up to 10 messages before and 10 after each poll, spaced by at least 1.1 seconds. It uses a separate Telegram API instance with retries controlled by the outbox: exponential backoff, server Retry-After, up to 8 attempts, 15-minute default TTL, terminal failure for blocked/rejected chats. An expired two-minute delivery lease can be reclaimed after restart. Delivery continues even during Sera outages.
+
+Delivery is bounded and recoverable, **not exactly once**: Telegram has no send-message idempotency key. If Telegram accepts a message but the acknowledgement or database write is lost, a retry may duplicate it. Failed or expired messages are not retried forever. Deletion cancels queued messages; it cannot retract an already accepted or in-flight send.
+
+The notification's **최신 Quote 확인** button loads only the user-owned pair/amount and calls the existing uncached `MarketService.quote` again. It does not reuse the trigger observation, quote UUID or route. The response shows minimum output/rate, provided gas cost, expiry and probe limitations. With wallet setup configured, **테스트 거래 계속** opens the separate wallet flow. This button is navigation, never financial consent.
+
+## What /alpha shows
+Send /alpha to see **지금 확인해볼 FX 조건**: a short list of Sera-derived conditions worth checking. It covers the configured sample set, not all thousands of registered markets. Each card gives the direction, source-token amount, last observed rate, timestamp and why it appeared. It is not a buy/sell recommendation, profit forecast, arbitrage detector or comparison with other venues.
+
+Signals:
+
+- **Movement:** a 1h/6h/24h change whose absolute magnitude reaches the configured threshold. Calculation: (current quoted rate / historical quoted rate − 1) × 100. Positive and negative signs show direction, without calling either good or bad. Rates use quoted minimum output / input at the same amount, including quoted costs. Fee changes can contribute to movement.
+- **거래 가능 규모 / quote availability:** the latest check returned a valid positive-output Sera quote at the stated source-token amount. It is neither total liquidity nor order-book depth, and a probe address does not guarantee your wallet can execute.
+- **Quote recovery:** two actual monitor observations establish unavailable → available, no more than ALPHA_DATA_MAX_AGE_SECONDS apart. First observation, unknown/error data and gaps longer than that cannot establish recovery. Remaining available never resets the recovery timestamp. Recovery stops appearing after 15 minutes by default, or on observed unavailability.
+
+Spread remains unavailable because verified bid/ask data is missing. Personal target rates remain in /alert; the scanner does not inspect or expose other users' thresholds or counts near them. There is no AI ranking. Growth reports are local and owner-only.
+
+## Scanner freshness, ranking and API load
+Current observations must be less than 180 seconds old by default and cannot have future timestamps. A failed latest probe suppresses that sample until a successful observation arrives, even if an older success is still recent. Warming, stale, no-quote, error, partial-data and insufficient-history states are explicit. Old data is excluded; /alpha does not launch a mass refresh.
+
+Observation freshness is different from the original quote's roughly 30-second expiry. The scanner describes a **past check**, with its timestamp. Its saved observation/quote is never presented as usable for execution. Press **최신 Quote 확인** to request current data.
+
+Movement uses the nearest actual same-direction/same-size observation to current observation time minus the window. Tolerance reuses ALERT_BASELINE_TOLERANCE_SECONDS (default ±300 seconds, capped at 10% of the window). Baseline times are displayed. Missing history means no movement signal; quote availability can still appear. History is shared with Phase 2 and retained by its existing 72-hour policy.
+
+Internal **notability** is only display ordering and is not shown as a trading score. Let F = 1 − observation_age / ALPHA_DATA_MAX_AGE_SECONDS, for a fresh observation:
+
+- Movement: 20 × min(5, abs(movement_pct) / configured_threshold) × F.
+- Recovery: 60 × (1 − recovery_age / ALPHA_RECOVERY_MAX_AGE_SECONDS) × F, only inside the recovery window.
+- Quote availability: 5 × F. Raw token amounts are not comparable between currencies and add no ranking weight.
+
+Scores round to 8 decimal places. A card takes the maximum signal score, rather than summing correlated signals. Signal ties use signal-type alphabetical order then shorter window. Card ties use newest observation then lexical network/address/amount key. One card consolidates all qualifying windows at one explicit amount. If several amounts qualify for the same directed pair, only its highest-ranked card is shown; historical rates are never mixed across sizes. Reverse directions remain separate. Apply ALPHA_MAX_RESULTS after consolidation. Three cards are sent in one Telegram message per page; each page recomputes freshness/ranking, so positions can change.
+
+The existing monitor merges public probe jobs with alert jobs under the **same** per-cycle group limit, soft time budget, request queue and oldest-evaluated rotation. Default scanner-only activity adds at most **3 quote POSTs per cycle**, plus cached catalog/configuration and server-time reads. An identical user alert costs no additional quote. Repeated /alpha calls and page changes make **zero Sera requests**; they read local data and save expiring button contexts. Current supported pairs are verified through existing /tokens and /markets methods. No endpoint or market field was added to the Sera adapter.
+
+Configured probe summaries survive restart, contain no user identity and are removed when a probe is removed from configuration. Changing resolved token addresses resets that probe's prior availability. Large alert workloads can delay scanner samples beyond freshness limits; reduce probes or tune the shared budget only within provider limits. Public numeric quotas remain unconfirmed.
+
+## Discovery to personal alerts and fresh quotes
+**최신 Quote 확인** loads a user-owned, expiring pair/amount intent and calls the existing uncached quote service. It shows current output/rate/costs/expiry and **시장 상황이 변했을 수 있어 최신 Quote를 다시 조회했습니다.** It performs no signing, transaction preparation or submission.
+
+**알림 설정** reuses the Phase 2 wizard with pair and amount already selected. The primary signal suggests movement, quote recovery or size availability. For movement, the user enters their own threshold and chooses 1/6/24 hours. For size/recovery, the existing confirmation screen appears. **No alert is created until 알림 만들기 is pressed.** Normal /alert remains available for different conditions or amounts. **시장 보기** reuses the existing market list filtered by the source token.
+
+## Verification
+```bash
+npm run typecheck
+npm test
+npm run build
+npm run sera:smoke
+npm run scanner:smoke
+```
+Unit/integration checks mock external APIs and cover parsing, exact arithmetic, minimum sizes, zero output, quote binding/refresh, Retry-After, caching, Korean commands, grammY transport and persisted database state.
+Phase 2 tests cover above/below thresholds, movement baselines, no-liquidity vs errors, cooldown/rearm, grouping, outbox retry/lease recovery, migrations, restart persistence, pagination, Korean/English setup, user isolation and a new HTTP quote request per alert-button tap.
+Phase 3 tests cover each movement window/direction, threshold and history boundaries, recovery/expiry/errors, freshness, deterministic capped ranking, consolidation, privacy, shared request budgets, pagination, Korean/English states, new HTTP quotes and explicit alert-prefill confirmation. The original Phase 1 test for /alpha now expects its implemented response rather than a future-phase placeholder; all previous test cases remain.
+Live smoke validates network, catalogs, reference data and a few quote probes. It never signs or submits financial mutations and does not require a Telegram token.
+
+Live acceptance follows [ACCEPTANCE.md](ACCEPTANCE.md). Automated checks/public probes do not establish live wallet or transaction acceptance.

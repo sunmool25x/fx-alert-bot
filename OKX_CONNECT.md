@@ -119,3 +119,19 @@ This list is compared with the worktree at the start of this task; earlier uncom
 - Static serving/CSP: `src/wallet/server.ts`.
 - Tests: `tests/okx-connector.test.ts`, `tests/okx-assets.test.ts`, `tests/wallet-routing.test.ts`.
 - Documentation: `README.md`, `ACCEPTANCE.md`, `OKX_CONNECT.md`, `WALLET_ROUTING.md`, `STATUS.md`, `THIRD_PARTY_NOTICES.md`.
+
+## Telegram and wallet connector setup
+
+The bot uses a private-chat inline `web_app` button: no `/newapp`, Main Mini App registration or Login Widget `/setdomain` is required. Use `/wallet`. If this bot already has a menu pointing at an old Quick Tunnel, its temporary URL is updated automatically. Unrelated/stable menu URLs are preserved and any mismatch is diagnosed. [Telegram documentation](https://core.telegram.org/bots/webapps#inline-button-mini-apps).
+
+The selected WalletConnect Ethereum Provider requires an owner-issued Reown Project ID. The backend supplies it to the authenticated signing page at runtime; launcher/preflight logs never print it. Missing/malformed values leave connection disabled while the read-only app works. No fake ID is sent to the real relay. Format validation is not relay authorization; pairing remains an owner test.
+
+A new, dedicated development project's documented empty origin allowlist avoids repeated domain registration. If you require an origin-restricted project, a stable named tunnel/custom domain is the alternative, with additional owner domain/account setup. The launcher does not create accounts, accept terms, modify Reown settings or connect wallets.
+
+**OKX Wallet uses official OKX Connect** (`@okxconnect/universal-provider@1.9.1`); **MetaMask keeps Reown/WalletConnect**. The OKX SDK generates its Web3 connection URL, passed unchanged to the mobile opening button or one desktop QR. The generic OKX download/exchange URL is rejected. No second wallet chooser or exchange login is used. The existing backend setup gates, including configured Reown readiness, remain unchanged.
+
+Use a current OKX Wallet/OKX App supporting OKX Connect. The selected [official EVM SDK guide](https://web3.okx.com/cs/onchainos/dev-docs/wallet/dapp-connect/app-connect-evm-sdk) documents **OKX App 6.88.0 or later**. The UI shows this requirement without claiming to detect your installed version. The optional OKX UI package is not installed.
+
+On mobile, **지갑 연결** opens a wallet-selection bottom sheet. Select OKX Wallet, then tap **OKX Wallet에서 계속** on its dedicated connection screen after preparation. This deliberate second gesture preserves reliable app opening after asynchronous relay setup. It should open Web3 Wallet approval directly; Exchange home without a connection prompt is a failure. Desktop uses a centered dialog with one SDK-link QR for the OKX **Web3 scanner**. Both paths then explain ownership verification before the separate **지갑에서 확인 / Verify in wallet** action. Success is explicit; closing it preserves the connection. The EVM connector uses `tg://resolve` for mobile connection and signing return, and no Telegram redirect for desktop scanning. Return to the original Mini App; a destroyed/expired view requires a fresh `/wallet` button and ownership proof. No Telegram authentication credentials are added to app links.
+
+Each OKX attempt runs in a disposable frame with memory-only SDK storage and a private message channel. The build includes its script, icon, CSP and dependency notices automatically through `npm run dev:live`. SDK diagnostics containing connection links are stripped and telemetry destinations blocked. See [connection and lifetime handling](#connection-and-lifetime-handling) for details. No financial authorization or execution gate is bypassed.

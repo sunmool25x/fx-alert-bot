@@ -57,7 +57,7 @@ No total order-book depth, native spread view/alert, limit-order management or V
 
 This pass changes copy, display attribution, help navigation and empty-state buttons. It does not change Sera calculations, alert evaluation/cooldowns/deduplication, scanner signals/thresholds, wallet authentication, signing, Permit/Intent payloads, transaction execution, settlement verification, database state machines or safety gates. Execution and mainnet remain disabled; Phase 5 NLU was not started.
 
-Recommended BotFather name, About/short description and Description in both languages are in [README.md](README.md#recommended-botfather-metadata). They are recommendations only. No Telegram profile metadata changes, bot restart, wallet authorization or live transaction are part of this pass.
+Recommended BotFather name, About/short description and Description in both languages are in [ACCEPTANCE.md](ACCEPTANCE.md#recommended-botfather-metadata). They are recommendations only. No Telegram profile metadata changes, bot restart, wallet authorization or live transaction are part of the branding pass.
 
 ## Verification
 
