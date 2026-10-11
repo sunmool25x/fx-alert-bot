@@ -28,6 +28,8 @@ Mainnet is rejected. This is an experimental MVP, not an audited trading release
 
 ## Current status
 
+[Phase 7P](PHASE7P.md) adds an isolated [offline Privy-style experiment](experiments/haruki-privy/README.md). Fast/normal timing fixtures fit a 30-second quote; real Privy signing, relayer acceptance and settlement remain unverified. This is **not a wallet migration** and does not solve the existing OKX timing blocker. No live SDK/client, server signer, financial request or execution permission was added.
+
 **First real OKX Permit signing verified on Sepolia; Intent signing and swap settlement remain pending.**
 
 The Sepolia test-token claim is finalized and reconciled. Historical read-only discovery found **2 test USDC → XSGD** to be the smallest successful tested quote; later acceptance uses an explicitly selected **50 test USDC** request. The first real owner-approved OKX ERC-2612 Permit is now **cryptographically VERIFIED**, encrypted and persisted, separately from execution. [Phase 7M](PHASE7M.md) records the original digest, exact fields, read-only chain checks and next-stage blockers. Its Quote and Permit have expired; the signature and financial lock remain preserved and cannot be reused for another Quote. **Intent signing and swap settlement remain unverified; execution stays OFF.** A Permit is financial authorization even when swap execution is disabled; quote expiry alone does not revoke it, and an established allowance survives Permit expiry. See [current status](STATUS.md) for the separate earlier UNKNOWN/invalid requests and their immutable history.

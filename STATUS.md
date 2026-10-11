@@ -1,6 +1,16 @@
 # Implementation status
 
-## Current — Phase 7O-PREP: mobile timing/protocol blocked; execution OFF
+## Current — Phase 7P: isolated Privy PoC ready, live compatibility unverified
+
+Classification **A — PRIVY_TESTNET_POC_READY (OFFLINE ONLY)**. [PHASE7P.md](PHASE7P.md) audits the separate Haruki repository at pinned commit `be50b4711c2665090769ebd1ac408d5629facf24`, where reuse licensing is not established. No upstream code was copied. The independent [experiment](experiments/haruki-privy/README.md) uses explicit simulated consent, exact existing schemas, serialized Privy-shaped requests, real synthetic-key signature recovery, one simulated submission and fixture receipt/transfer/balance reconciliation.
+
+FAST/NORMAL assumptions reach acknowledgment in **3.45 / 11.35 seconds**; slow signing/reading and delayed/unknown submissions fail closed. Real Privy signing latency, authenticated policy behavior, live relayer acceptance and settlement are **not verified**. The actual 0.35.0 SDK Ethereum method passed a mock-RPC boundary probe; no dependency/client was installed into production. Read-only Sera config and two RPC domain checks match the existing deployment. The OKX timing blocker remains unchanged.
+
+Targeted **43/43 PASS**, full suite **926/926 PASS**, zero skipped; typecheck/build PASS. Audit reports the same 3 moderate findings, zero high/critical and no available fix; no dependency changes. Mainnet/swap execution remain OFF. No live financial signature, wallet creation, relayer submission, transaction, financial migration or retirement is part of this phase. Gitleaks/publication/configured-secret scans pass across 261 public files. All 13 financial/wallet/history tables, encrypted evidence, active Permit lock, schema 14, environment and runtime origin are preserved; database integrity ok, zero foreign-key errors. Public HTTPS health/page checks pass after the existing launcher's normal rebuild; no tunnel replacement or duplicate runtime was started.
+
+**Next owner action: review and authorize the isolated free Privy test-wallet setup in PHASE7P.md, without authorizing a trade yet.** This is a custody/setup decision for a new wallet; do not retry the existing OKX Permit or clear its historical lock.
+
+## Historical — Phase 7O-PREP: mobile timing/protocol blocked; execution OFF
 
 Classification **C — MOBILE_TIMING_OR_PROTOCOL_BLOCKED**. [PHASE7O_PREP.md](PHASE7O_PREP.md) records complete independent historical Approval evidence, a passing valid-expired Permit retirement dry run and measured read-only Quote timing. The original `PERMIT_SIGNED` ciphertext and lock remain untouched; no live retirement or financial migration was applied. dRPC accepts 50-block history queries but rejects 500/1,000-block queries with a misleading free-plan range message. Retirement and settlement catch-up now use bounded 50-block queries without weakening evidence requirements.
 

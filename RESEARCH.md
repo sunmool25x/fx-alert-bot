@@ -1,6 +1,10 @@
 # Sera Korea FX Bot — Research
 Initial research date: 2026-09-16 UTC. Phase 4.5 findings below supersede the older funding/setup unknowns; older phase reports remain historical. See [PHASE4_CONTRACT.md](PHASE4_CONTRACT.md) for the selected signing contract and [STATUS.md](STATUS.md) for evidence and acceptance status. No real wallet signature, token claim or financial submission was performed during research.
 
+## Later repository audit: Phase 7P, 2026-10-11
+
+The separate [mashharuki/Sera-Telegram-Bot](https://github.com/mashharuki/Sera-Telegram-Bot/tree/be50b4711c2665090769ebd1ac408d5629facf24) was inspected at commit `be50b4711c2665090769ebd1ac408d5629facf24`. Its tree contains no license file, package.json has no license field, README declares no license and GitHub reports license null. Modification/redistribution/derivative source reuse is not established; **no implementation was copied**. The MIT findings and attribution for the earlier SeraProtocol-Sample remain historical and do not license this separate repository. The independent offline harness uses official interfaces and our existing protocol validators. [PHASE7P.md](PHASE7P.md) documents the actual Privy architecture, source audit, custody differences, SDK compatibility limits and timing fixtures. The upstream swap path reports API-response success without independent swap settlement verification. Real Privy latency and finalized swap acceptance remain unverified.
+
 ## Phase 4.5 addendum — 2026-09-17 KST
 
 ### Follow-up: one-command live setup (2026-09-17 KST)
