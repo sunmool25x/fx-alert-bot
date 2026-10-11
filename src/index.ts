@@ -13,6 +13,7 @@ import { telegramNotifications } from "./bot/notifications.js";
 import { ScannerCoverage } from "./scanner/coverage.js";
 import { SepoliaReads } from "./wallet/chain.js";
 import { TradeService } from "./trades/service.js";
+import{PermitService}from'./permits/service.js';
 import { signingServer } from "./wallet/server.js";
 import { SettlementMonitor } from "./trades/settlement.js";
 import { tradeView } from "./trades/view.js";
@@ -33,7 +34,8 @@ async function main() {
   }):undefined;
   const reconcile=settlement?(user:string)=>settlement.refresh(user):undefined;
   const bot = createTelegramBot(config.botToken, new BotController(store, market, config,Date.now,chain,reconcile));
-  const web=config.wallet.uiReady&&chain?signingServer(config,store,chain,new TradeService(store,client,chain,config,client.executionTransport()),Date.now,reconcile):undefined;
+  const tradeService=chain?new TradeService(store,client,chain,config,client.executionTransport()):undefined;
+  const web=config.wallet.uiReady&&chain&&tradeService?signingServer(config,store,chain,tradeService,Date.now,reconcile,undefined,new PermitService(store,tradeService,client,chain,config)):undefined;
   const monitor = new AlertMonitor(store, market, config, telegramNotifications(new Api(config.botToken, { timeoutSeconds: 20 })),
     Date.now, undefined, new ScannerCoverage(store.scanner, market, config));
   let stopping = false;

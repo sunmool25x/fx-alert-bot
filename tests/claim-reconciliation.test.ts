@@ -5,7 +5,15 @@ import {receiptCosts,nativeAccounting} from '../src/claims/receipt-evidence.js';
 import {ClaimStatusPolling,claimStatus} from '../web/claim-status.js';
 import {claimReceived,tokenAmount} from '../web/claim-panel.js';
 import {other} from './trade-helpers.js';
+import {AppError} from '../src/utils/errors.js';
 const balances={eth:'93805932029893351',usdc:'1000000000000000',xsgd:'1000000000000000'};
+test('explicit two-USDC claim preview preserves legacy amount, requires ownership and never resizes no-liquidity',async()=>{
+ const f=await claimFixture();try{const r=await f.prepare();await f.claims.confirm(f.session,r.id,r.version);f.result({state:'verified',balances,evidence:claimEvidence()});await f.claims.report(f.session,r.id,claimHash);
+ const id=await f.claims.firstSwapIntent(f.session,r.id,'2');assert.equal((await f.store.intent(id,'1'))?.amount,'2');let requests=0;f.api.getQuote=async request=>{requests++;assert.equal(request.from_amount,'2000000');throw new AppError('NO_LIQUIDITY');};
+ await assert.rejects(f.service.preview(f.session,id),{code:'NO_LIQUIDITY'});assert.equal(requests,1);assert.equal(f.submitted(),0);assert.equal(f.store.wallet.list('1').length,0);
+ await assert.rejects(f.claims.firstSwapIntent(f.session,r.id,'5' as '2'));f.advance(900001);await assert.rejects(f.claims.firstSwapIntent(f.session,r.id,'2'),{code:'AUTH_STALE'});
+ }finally{f.store.close();}
+});
 test('legacy failure is repaired from its original persisted hash; every subsequent refresh is idempotent',async()=>{
   const f=await claimFixture();try{const r=await f.prepare();await f.claims.confirm(f.session,r.id,r.version);f.result({state:'invalid'});await f.claims.report(f.session,r.id,claimHash);
     const simulations=f.simulations();let receipts=0;f.chain.receipt=async(_wallet,hash)=>{assert.equal(hash,claimHash);receipts++;return {state:'verified',balances,evidence:claimEvidence()};};f.advance(16000);

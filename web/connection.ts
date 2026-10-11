@@ -3,7 +3,7 @@ export interface WalletProvider {
   connect():Promise<unknown>;
   request(args:{method:string;params:unknown[]}):Promise<unknown>;
 }
-export class WalletFlowError extends Error {constructor(readonly code:string){super(code);}}
+export class WalletFlowError extends Error {constructor(readonly code:string,readonly rpcCode?:number){super(code);}}
 export type WalletApi=(path:string,body?:unknown)=>Promise<any>;
 export type PreparedOwnership={verify:(onRequest?:()=>void)=>Promise<string>};
 export async function connectAndVerify(provider:WalletProvider,api:WalletApi,epoch:()=>number,onConnected:()=>void=()=>{},routingGuard:()=>void=()=>{},onSignatureRequest:()=>void=()=>{}) {

@@ -28,12 +28,13 @@ export class OkxConnection implements WalletConnection,ConnectedProvider {
   accounts:string[]=[];chainId=11155111;session?:OkxSnapshot;handoffUri?:string;
   private live=true;private topic="";private sequence=0;private timer?:ReturnType<typeof setTimeout>;
   private claimRequested=false;
+  private timedOutPermits=new Set<number>();
   private rejection?:(error:Error)=>void;
   private requests=new Map<number,{resolve:(value:unknown)=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
   private listeners=new Map<string,Set<(...args:any[])=>void>>();
   constructor(readonly environment:TelegramEnvironment,private bridge:OkxBridge=browserOkxBridge(environment),private originGuard=()=>{}){}
   on(event:string,listener:(...args:any[])=>void){const set=this.listeners.get(event)??new Set();set.add(listener);this.listeners.set(event,set);}
-  private emit(event:string){for(const listener of this.listeners.get(event)??[])listener();}
+  private emit(event:string,...args:unknown[]){for(const listener of this.listeners.get(event)??[])listener(...args);}
   assertActive(){try{this.originGuard();}catch(e){this.cancel();throw e;}if(!this.live)throw new WalletFlowError("WALLET_CONNECT_CANCELLED");}
   assert(){this.assertActive();if(!this.session||!this.topic||this.session.topic!==this.topic||this.session.chainId!==11155111||!this.accounts[0])throw new WalletFlowError("WALLET_REQUIRED");}
   start(onUri:(uri:string)=>void,onExpired:()=>void):Promise<ConnectedProvider> {
@@ -59,11 +60,14 @@ export class OkxConnection implements WalletConnection,ConnectedProvider {
             if(message.type==="connected"){
               this.handoffUri=assertOkxLink(message.requestUri,false);clearTimeout(this.timer);this.rejection=undefined;resolve(this);
             }else if(changed)this.emit("accountsChanged");
+          }else if(message.type==='permit_stage'){
+            if(this.requests.has(message.id)&&['SDK_INVOKED','SDK_RETURNED'].includes(message.stage)){this.assert();this.emit('permitStage',message.stage);}
           }else if(message.type==="response"){
+            if(this.timedOutPermits.has(message.id)){this.assert();this.timedOutPermits.delete(message.id);this.emit('permitLateResult',message.result);return;}
             const request=this.requests.get(message.id);if(!request)return;this.assert();this.requests.delete(message.id);clearTimeout(request.timer);request.resolve(message.result);
           }else if(message.type==="disconnect"){this.cancel();this.emit("disconnect");}
           else if(message.type==="error"){
-            const error=new WalletFlowError(message.code==="NETWORK_MISMATCH"?"NETWORK_MISMATCH":"WALLET_CONNECT_CANCELLED");
+            const error=new WalletFlowError(['NETWORK_MISMATCH','USER_REJECTED','WALLET_TRANSPORT_ERROR'].includes(message.code)?message.code:'WALLET_CONNECT_CANCELLED',typeof message.rpcCode==='number'&&Number.isSafeInteger(message.rpcCode)?message.rpcCode:undefined);
             const request=this.requests.get(message.id);if(request){clearTimeout(request.timer);this.requests.delete(message.id);request.reject(error);}else{this.cancel();this.emit("disconnect");}
           }
         }catch(e){this.cancel();this.emit("disconnect");}
@@ -80,13 +84,13 @@ export class OkxConnection implements WalletConnection,ConnectedProvider {
       args={method:args.method,params:[Object.freeze({...args.params[0] as object})]};
     }
     const id=++this.sequence;
-    return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.requests.delete(id);reject(new WalletFlowError("OWNERSHIP_REJECTED"));},120_000);
+    return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.requests.delete(id);if(args.method==='eth_signTypedData_v4')this.timedOutPermits.add(id);reject(new WalletFlowError(args.method==='eth_signTypedData_v4'?'WALLET_TIMEOUT':'OWNERSHIP_REJECTED'));},120_000);
       this.requests.set(id,{resolve,reject,timer});this.bridge.send({type:"request",id,args});});
   }
   async disconnect(){this.cancel();}
   cancel(){
     if(!this.live)return;this.live=false;clearTimeout(this.timer);this.accounts=[];this.session=undefined;this.handoffUri=undefined;
     const error=new WalletFlowError("WALLET_CONNECT_CANCELLED");this.rejection?.(error);this.rejection=undefined;
-    for(const request of this.requests.values()){clearTimeout(request.timer);request.reject(error);}this.requests.clear();this.bridge.close();
+    for(const request of this.requests.values()){clearTimeout(request.timer);request.reject(error);}this.requests.clear();this.timedOutPermits.clear();this.bridge.close();
   }
 }

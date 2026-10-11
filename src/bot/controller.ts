@@ -18,6 +18,8 @@ import { normalizedAmount,positiveThreshold } from "../alerts/source.js";
 import { track } from "../analytics/actions.js";
 import { entryFromOrigin,triggerFromOrigin,type EventContext,type Period,type ParsedIntent } from "../analytics/types.js";
 import { statsView,type StatsScreen } from "../analytics/views.js";
+import {continuationLog} from '../wallet/continuation-log.js';
+import {validateAmount,toRawUnits} from '../sera/precision.js';
 
 export interface Input { userId: string; text?: string; callback?: string; updateId?:number }
 export interface Output { origin?:ActionOrigin;analytics?:EventContext;reply(view: View): Promise<void> }
@@ -121,9 +123,22 @@ export class BotController {
       const entry=entryFromOrigin(origin??(operation==="swap"?"swap":"quote"));
       const context={entry,parentId:triggerFromOrigin(origin??"")??out.analytics?.parentId};
       track(this.store,user,out,"quote_requested",context);
-      const card = await this.market.quote(from, to, amount);
+      continuationLog('QUOTE_PARSED','OK',user.id);
+      // Save the validated request separately from its short-lived external quote.
+      // Same amount/minimum/precision limits already enforced by MarketService.
+      if(!validateAmount(amount,from.decimals).ok)throw new AppError('INVALID_AMOUNT');
+      const input=toRawUnits(amount,from.decimals);if(input<=0n||input>=2n**256n)throw new AppError('INVALID_AMOUNT');
+      if(from.min_trade_amount_raw&&input<BigInt(from.min_trade_amount_raw))throw new AppError('AMOUNT_BELOW_MIN');
       const id = await this.store.saveIntent(user.id, from.address, to.address, amount,origin??(operation==="swap"?"swap":"quote"),out.origin);
       if(context.parentId)this.store.analytics.bestEffort(()=>this.store.inputOrigins.quoteParent(id,context.parentId!));
+      let card;
+      try{card=await this.market.quote(from,to,amount);}
+      catch(e){
+        if(errorCode(e)!=='NO_LIQUIDITY'||!this.config.wallet.ready)throw e;
+          await out.reply({text:(user.language==='ko'?'현재 시장 Quote를 받을 수 없어요. 요청 금액은 그대로 저장했습니다. 지갑 연결 후 같은 조건으로 새 Quote를 조회할 수 있습니다. 금융 승인이나 거래는 진행되지 않았습니다.':'The market quote is unavailable. Your exact request is saved; after wallet verification, check a fresh quote for the same terms. No financial authorization or trade occurred.')+'\n\n'+amount+' '+from.symbol+' → '+to.symbol,buttons:[[{text:walletText[user.language].continue,data:'trade:'+id}]]});
+          await this.store.clearFlow(user.id);
+          return;
+      }
       await out.reply(quoteView(card, user.language, id, this.config.network));
       track(this.store,user,out,"fresh_quote_viewed",{...context,entityId:id});
     }

@@ -1,6 +1,7 @@
 import { OkxMemoryStorage,okxConnectParams,okxSnapshot,assertOkxLink,assertOkxRequest,matchesOkxTopic,OKX_CHAIN } from "./okx-protocol.js";
 import type { TelegramEnvironment } from "./routing.js";
 import { okxDappMetadata,walletRedirect } from "./wallet-trust.js";
+import { okxTypedDataRequest } from './okx-typed-data.js';
 // This frame isolates the vendor's global singleton and cached session lifetime.
 // It is not a substitute for backend authentication or an untrusted-code sandbox.
 Object.defineProperty(window,"localStorage",{value:new OkxMemoryStorage(),configurable:false});
@@ -13,7 +14,9 @@ window.addEventListener("message",function initialize(event:MessageEvent){
   const send=(type:string,data:Record<string,unknown>={})=>port.postMessage({type,...data});
   let sdk:import("@okxconnect/universal-provider").OKXUniversalProvider|undefined,topic="",uri="",stopped=false;
   let claimRequested=false;
-  const fail=(error:unknown,id?:number)=>{const code=(error as {code?:unknown})?.code;send("error",{id,code:["NETWORK_MISMATCH","WALLET_REQUIRED"].includes(String(code))?code:"WALLET_CONNECT_CANCELLED"});};
+  const fail=(error:unknown,id?:number,financial=false)=>{const code=(error as {code?:unknown})?.code;
+    const rpc=typeof code==='number'&&Number.isSafeInteger(code)&&Math.abs(code)<=2147483647?code:undefined;
+    send('error',{id,code:financial?(rpc===4001?'USER_REJECTED':'WALLET_TRANSPORT_ERROR'):["NETWORK_MISMATCH","WALLET_REQUIRED"].includes(String(code))?code:"WALLET_CONNECT_CANCELLED",...(financial&&rpc!==undefined?{rpcCode:rpc}:{})});};
   port.onmessage=async({data})=>{
     if(stopped||!sdk)return;
     try{
@@ -26,9 +29,13 @@ window.addEventListener("message",function initialize(event:MessageEvent){
         data.args.params=[Object.freeze({...data.args.params[0]})];
         assertOkxRequest(data.args,current.accounts[0]);
       }
-      const result=await sdk.request({...data.args,redirect:walletRedirect(environment,"okx")},OKX_CHAIN);
-      if(stopped)return;okxSnapshot(sdk.session,topic);send("response",{id:data.id,result});
-    }catch(e){fail(e,data.id);}
+      const request=okxTypedDataRequest(data.args,current.accounts[0]!);
+      if(request.method==='eth_signTypedData_v4')send('permit_stage',{id:data.id,stage:'SDK_INVOKED'});
+      const result=await sdk.request({...request,redirect:walletRedirect(environment,"okx")},OKX_CHAIN);
+      if(stopped)return;okxSnapshot(sdk.session,topic);
+      if(request.method==='eth_signTypedData_v4')send('permit_stage',{id:data.id,stage:'SDK_RETURNED'});
+      send("response",{id:data.id,result});
+    }catch(e){fail(e,data.id,data.args?.method==='eth_signTypedData_v4');}
   };
   void (async()=>{
     // Dynamic import happens after installing memory storage, before any SDK singleton.

@@ -8,6 +8,7 @@ import { AppError } from "../utils/errors.js";
 import { tradeView } from "../trades/view.js";
 import { track } from "../analytics/actions.js";
 import { entryFromOrigin } from "../analytics/types.js";
+import {continuationLog} from '../wallet/continuation-log.js';
 export class WalletController {
   constructor(private store:Store,private config:Config,private chain?:ChainReads,private reconcile?:(user:string)=>Promise<void>) {}
   async show(user:User,out:Output) {
@@ -35,7 +36,9 @@ export class WalletController {
     const m=walletText[user.language],intent=await this.store.intent(intentId,user.id);
     if(!intent)throw new AppError("TRADE_STATE");
     if(!this.config.wallet.ready){await out.reply({text:m.setup});return;}
-    await out.reply({text:[m.safety,m.changed,m.infrastructure,m.attribution].join("\n\n"),buttons:[[{text:m.continue,data:"wallet",webApp:this.config.wallet.origin+"/#intent="+encodeURIComponent(intent.id)}]]});
+    this.store.continuations.ensure(intent);this.store.continuations.select(intent.id,user.id);continuationLog('SELECTED','OK',user.id,intent.id);
+    // Query parameters reach the bootstrap URL; the server selection also survives a missing route ID.
+    await out.reply({text:[m.safety,m.changed,m.infrastructure,m.attribution].join("\n\n"),buttons:[[{text:m.continue,data:"wallet",webApp:this.config.wallet.origin+"/?intent="+encodeURIComponent(intent.id)}]]});
     track(this.store,user,out,"trade_flow_started",{entry:entryFromOrigin(intent.origin),entityId:intent.id,parentId:intent.id,key:intent.id});
   }
   async disconnect(user:User,out:Output) {this.store.wallet.disconnect(user.id);await out.reply({text:walletText[user.language].disconnected});}

@@ -23,6 +23,19 @@ test("wallet selection dispatches OKX to its official connector while MetaMask s
   const okx=createWalletConnection("okx","ios",{projectId:"unused",origin:currentOrigin()},currentOrigin);assert(okx instanceof OkxConnection);
   const mm=createWalletConnection("metamask","ios",{projectId:"unused",origin:currentOrigin()},currentOrigin);assert(!(mm instanceof OkxConnection));assert.equal(mm.choice,"metamask");okx.cancel();mm.cancel();
 });
+test('OKX financial request preserves numeric rejection/error codes without raw provider text or retry',async()=>{
+  for(const [code,rpc]of [['USER_REJECTED',4001],['WALLET_TRANSPORT_ERROR',-32000]] as const){
+    const f=fixture();await f.connect();const result=f.connector.request({method:'eth_signTypedData_v4',params:[address,'fixture-permit']});
+    const request=f.sent.at(-1);f.receive({type:'error',id:request.id,code,rpcCode:rpc,message:'private provider data'});
+    await assert.rejects(result,(e:any)=>e.code===code&&e.rpcCode===rpc&&!e.message.includes('private provider data'));assert.equal(f.sent.filter(m=>m.type==='request').length,1);f.connector.cancel();
+  }
+});
+test('financial callback timeout stays unknown, delivers a late original result once and never retries',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});const f=fixture();await f.connect();
+  const pending=f.connector.request({method:'eth_signTypedData_v4',params:[address,'fixture-permit']});const rejected=assert.rejects(pending,{code:'WALLET_TIMEOUT'}),request=f.sent.at(-1);
+  const late:unknown[]=[];f.connector.on('permitLateResult',value=>late.push(value));t.mock.timers.tick(120001);await rejected;f.receive({type:'response',id:request.id,result:'0x'+'ab'.repeat(65)});assert.equal(late.length,1);f.receive({type:'response',id:request.id,result:'ignored duplicate'});assert.equal(late.length,1);assert.equal(f.sent.filter(m=>m.type==='request').length,1);f.connector.cancel();
+});
+test('SDK stage observations are bound to one active connector request and never contain result bytes',async()=>{const f=fixture();await f.connect();const stages:unknown[]=[];f.connector.on('permitStage',stage=>stages.push(stage));const pending=f.connector.request({method:'eth_signTypedData_v4',params:[address,'fixture-permit']}),id=f.sent.at(-1).id;f.receive({type:'permit_stage',id:id+1,stage:'SDK_INVOKED'});f.receive({type:'permit_stage',id,stage:'SDK_INVOKED'});f.receive({type:'permit_stage',id,stage:'untrusted'});f.receive({type:'permit_stage',id,stage:'SDK_RETURNED'});f.receive({type:'response',id,result:'fixture-only'});await pending;assert.deepEqual(stages,['SDK_INVOKED','SDK_RETURNED']);f.connector.cancel();});
 test("SDK Web3 link is passed unchanged to the mobile opener",()=>{
   for(const platform of ["ios","android"] as const){const opened:string[]=[];openWallet("okx",platform,uri,{https:u=>opened.push(u),native:()=>assert.fail()});assert.deepEqual(opened,[uri]);}
 });

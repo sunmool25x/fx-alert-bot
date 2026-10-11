@@ -97,5 +97,5 @@ export function walletPicker(options:{root:HTMLElement;language:"ko"|"en";telegr
     }),
   });
   close.onclick=()=>flow.close();dialog.addEventListener("cancel",e=>{e.preventDefault();flow.close();});
-  return {choose:()=>flow.choose(),cancel:()=>flow.cancel(),lost:()=>flow.lost(),claimReady:()=>flow.claimReady(),requestHandoff:()=>flow.requestHandoff()};
+  return {choose:()=>flow.choose(),renewOwnership:()=>flow.renewOwnership(),cancel:()=>flow.cancel(),lost:()=>flow.lost(),claimReady:()=>flow.claimReady(),requestHandoff:()=>flow.requestHandoff()};
 }

@@ -11,7 +11,7 @@ import { liveSummary } from "./live/report.js";
 import { readEnvironment,liveEnvironment,projectIdValid,writeState,clearState,alive } from "./live/environment.js";
 import { ensureCloudflared,tunnelEnvironment,tunnelArgs,parseTunnelOrigin } from "./live/tunnel.js";
 import { syncDevelopmentMenu } from "./live/telegram.js";
-import { ownedChild,finished,lines,stopChild,safeChildLine,waitFor,SetupError } from "./live/processes.js";
+import { ownedChild,finished,lines,discardOutput,stopChild,safeChildLine,waitFor,SetupError } from "./live/processes.js";
 import { sourceFingerprint,StableSourceChange } from "./live/reload.js";
 
 export function localHealth(port:number,origin:string,connectorReady?:boolean):Promise<boolean> {
@@ -49,6 +49,7 @@ export async function runLive(root:string,checkOnly=false,parent:NodeJS.ProcessE
     ];
     for(const [label,args] of steps){
       cancel.signal.throwIfAborted();const child=attach(ownedChild(process.execPath,args,root,{...tunnelEnvironment(env),SERA_NETWORK:"sepolia",ENABLE_MAINNET:"false",ENABLE_TESTNET_EXECUTION:"false"}));
+      discardOutput(child);
       const abort=()=>{void stopChild(child);};cancel.signal.addEventListener("abort",abort,{once:true});
       try{if(await finished(child)!==0)throw new SetupError(label==="Tests"?"TESTS_FAILED":label==="Typecheck"?"TYPECHECK_FAILED":"BUILD_FAILED");}finally{cancel.signal.removeEventListener("abort",abort);}
       console.info("✓ "+label);

@@ -2,7 +2,22 @@
 
 Start with [README: Start Live Testing](README.md#start-live-testing). Telegram mobile Mini App launch, official OKX Web3 handoff, connection and backend ownership verification have been successfully tested. MetaMask, Telegram Desktop, real swap submission and settlement remain unverified. Preserve existing private credentials. The launcher manages the tunnel/origin and rebuilds source changes on new launches. Mark a box only after **you perform that check**. Automated tests and public probes are recorded separately in [STATUS.md](STATUS.md); they do not complete phone tests.
 
-## Current gate — Phase 7D review prepared
+## Current gate — Phase 7M Permit verified; execution preparation only
+
+- [x] Owner completed one real mobile OKX Permit for exactly 50 test USDC → XSGD.
+- [x] Original signature independently recovered to the acceptance wallet; token, amount, spender, chain, nonce, domain and digest match. Encrypted callback and verified copy retained.
+- [x] Mark **mobile Permit signing VERIFIED**, separately from on-chain approval or settlement.
+- [x] Historical Quote (04:17:14 UTC) and Permit (04:21:43 UTC, 2026-10-11) expired. Original `PERMIT_SIGNED` record and financial lock remain preserved; no reuse or retirement.
+- [x] Read-only chain reconciliation: current nonce/allowance 0/0; no relevant approval or settlement in the inspected attempt interval; zero application trade sessions/attempts.
+- [x] Mainnet and swap execution remain OFF; no new Quote, Permit, Intent, relayer submission or transaction in Phase 7M.
+- [ ] Review [the next-stage plan and blockers](PHASE7M.md#concrete-blockers-before-owner-controlled-execution).
+- [ ] Implement and test the existing full-trade path with execution still OFF: exact Intent wire domain, persistent signature stages, shared locks/cost gates, expiry/unknown-result handling and bounded timing.
+- [ ] Only after separate authorization and readiness: a completely new owner-controlled package, two separate financial signatures and one explicit relayer submission.
+- [ ] Verify actual finalized settlement, signed token bounds, recipient and final balances.
+
+**Next owner action: review the Phase 7M plan. Do not start another Quote or wallet signature.** One successful Permit is not end-to-end trade acceptance. Existing historical checkpoints below do not authorize replaying an expired package or enabling execution.
+
+## Historical gate — Phase 7D review prepared
 
 The complete read-only matrix found a positive forward quote at **2 test USDC**, the smallest successful tested amount; this is classification **B**, not pair-wide no liquidity. Use USDC → XSGD; no fallback. See [matrix, costs and verified Permit/Intent/relayer architecture](PHASE7D.md). Discovery does not change a user's amount, create a trade or authorize execution.
 

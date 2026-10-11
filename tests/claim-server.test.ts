@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import {request} from 'node:http';
 import {createHmac} from 'node:crypto';
 import {signingServer} from '../src/wallet/server.js';
-import {signer} from './trade-helpers.js';
+import {signer,wire} from './trade-helpers.js';
 import {claimFixture} from './claim-helpers.js';
 import {claimSimulationLog} from '../src/claims/diagnostics.js';
 import {claimSnapshot,claimHash,claimEvidence} from './claim-helpers.js';
+import {AppError} from '../src/utils/errors.js';
 async function setup(){
   const f=await claimFixture();f.config.botToken='claim-test-token';
   const server=signingServer(f.config,f.store,await import('./trade-helpers.js').then(m=>m.mockChain()),f.service,f.now,undefined,f.chain);
@@ -52,5 +53,23 @@ test('HTTP status refresh repairs the existing hash and repeated presses cannot 
     const first=await s.call('claim/refresh',{id:review.id});assert.equal(first.status,200);assert.equal(first.body.state,'CLAIM_BALANCES_VERIFIED');
     for(let i=0;i<3;i++){const repeated=await s.call('claim/refresh',{id:review.id});assert.equal(repeated.status,200);assert.deepEqual(repeated.body,first.body);}
     assert.equal(s.f.simulations(),2);assert.equal(s.f.submitted(),0);assert.equal(s.f.store.claims.list('1').length,1);assert.equal((await s.call('claim/prepare')).body.code,'CLAIM_BUSY');
+  }finally{await s.close();}
+});
+
+test('authenticated explicit 2-USDC HTTP preview stays read-only, fails closed on liquidity and requires fresh ownership',async()=>{
+  const s=await setup();try{
+    await s.login();const r=(await s.call('claim/prepare')).body;await s.call('claim/confirm',{id:r.id,version:r.version});
+    s.f.result({state:'verified',balances:{eth:'100000000000000000',usdc:'1000000000000000',xsgd:'1000000000000000'},evidence:claimEvidence()});
+    await s.call('claim/report',{id:r.id,hash:claimHash});let reads=0;
+    s.f.api.getQuote=async request=>{reads++;assert.equal(request.from_amount,'2000000');assert.equal(request.recipient,request.owner_address);const q=wire(request.owner_address);q.route_params.initialDepositAmount=q.route_params.maxInputAmount=q.permit.value_raw=q.permit.eip712.message.value='2000000';return q;};
+    const response=await s.call('claim/preview',{id:r.id,amount:'2'});assert.equal(response.status,200);assert.equal(reads,1);
+    assert.equal(response.body.state,'PREVIEW');assert.equal(response.body.financialAuthorizationAvailable,false);assert.equal(response.body.version,null);assert.equal(response.body.economics.status,'FAIL');assert.equal(response.body.economics.reason,'UNVERIFIED_COSTS');
+    assert.equal((await s.call('confirm',{id:r.id,version:r.version})).body.code,'EXECUTION_DISABLED');
+    assert.equal((await s.call('submit',{id:r.id,version:r.version,signature:'0x'+'a'.repeat(130),permitSignature:'0x'+'b'.repeat(130)})).body.code,'EXECUTION_DISABLED');
+    assert.equal((await s.call('claim/preview',{id:r.id,amount:'5'})).status,400);assert.equal(reads,1);
+    s.f.api.getQuote=async request=>{reads++;assert.equal(request.from_amount,'2000000');throw new AppError('NO_LIQUIDITY');};
+    assert.equal((await s.call('claim/preview',{id:r.id,amount:'2'})).body.code,'NO_LIQUIDITY');assert.equal(reads,2);
+    assert.equal(s.f.store.wallet.list('1').length,0);assert.equal(s.f.submitted(),0);
+    s.f.advance(900001);assert.equal((await s.call('claim/preview',{id:r.id,amount:'2'})).body.code,'AUTH_STALE');assert.equal(reads,2);
   }finally{await s.close();}
 });

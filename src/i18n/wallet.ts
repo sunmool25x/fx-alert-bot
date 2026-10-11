@@ -44,6 +44,12 @@ export const walletText={
   }
 } as const;
 const reasons:Record<string,[string,string]>={
+  PERMIT_DISABLED:['Permit 전용 테스트 단계가 비활성 상태입니다.','Permit-only acceptance is disabled.'],
+  PERMIT_LOCKED:['이미 Permit을 요청했거나 결과를 확인 중입니다. 다시 서명하지 마세요. Intent와 제출은 차단되어 있습니다.','A Permit request was already reserved or attempted. Do not sign again. Intent and submission are blocked.'],
+  COST_REVIEW_BLOCKED:['비용 검토 기준을 통과하지 못해 Permit을 요청하지 않습니다.','Cost review did not pass. No Permit will be requested.'],
+  USER_REJECTED:['사용자가 Permit 서명을 거절했습니다. 다시 요청하지 않습니다.','The owner rejected Permit signing. It will not be retried.'],
+  WALLET_TIMEOUT:['지갑 응답 시간이 지났습니다. 서명 여부가 불확실하므로 다시 요청하지 않습니다.','Wallet response timed out. Signing outcome is uncertain; no retry.'],
+  WALLET_TRANSPORT_ERROR:['지갑 연결 오류로 중단했습니다. 자동 재요청하지 않습니다.','Stopped on a wallet transport error. No automatic retry.'],
   CLAIM_DISABLED:["테스트 자금 수령은 Sepolia와 허용 계정에서 교환 실행이 꺼져 있을 때만 가능합니다.","Test funding requires Sepolia, an allowed account, and swap execution OFF."],
   CLAIM_INVALID:["수령 요청의 거래 정보가 맞지 않아 중단했습니다.","The claim transaction did not match the verified details."],
   CLAIM_CONTRACT_MISMATCH:["공식 테스트 자금 계약을 검증하지 못했습니다.","The official test funding contract could not be verified."],
@@ -75,6 +81,7 @@ const reasons:Record<string,[string,string]>={
   EXECUTION_DISABLED:[walletText.ko.disabled,walletText.en.disabled],NOT_ALLOWLISTED:["이 계정은 테스트 거래 허용 목록에 없습니다.","This account is not on the test execution allowlist."],
   NO_LIQUIDITY:["현재 입력한 규모로 거래할 수 있는 Quote가 없습니다.","No executable quote is available at this size."],
   QUOTE_STALE:["Quote가 만료되었거나 조건이 바뀌었습니다. 새 Quote를 받고 다시 확인해 주세요.","The quote expired or changed. Obtain and review a new quote."],
+  PERMIT_RESULT_UNKNOWN:["이전 Permit 응답을 확정할 수 없어 잠금을 유지합니다. 새 서명을 요청하지 마세요.","The previous Permit response is unresolved and stays locked. Do not request another signature."],
   TRADE_STATE:["이 거래 화면은 더 이상 유효하지 않습니다. 상태를 확인해 주세요.","This trade screen is no longer valid. Check its status."],
   WALLET_BUSY:["이 지갑의 이전 거래 결과를 먼저 확인해야 합니다. 다시 제출하지 않습니다.","Resolve the wallet's existing trade first. It will not be resubmitted."],
   WALLET_REQUIRED:["지갑 소유 확인을 다시 진행해 주세요.","Verify wallet ownership again."],

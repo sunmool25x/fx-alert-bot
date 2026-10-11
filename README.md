@@ -24,14 +24,18 @@ Mainnet is rejected. This is an experimental MVP, not an audited trading release
 
 ## Current status
 
-The Sepolia test-token claim is finalized and reconciled. Read-only amount discovery found **2 test USDC → XSGD** to be the smallest successful tested quote; 1 USDC returned `No liquidity`. A transparent, separate Permit/Intent review is implemented. **No swap is submitted and execution stays OFF.** Fresh ownership and a new quote are required before any later authorization. See [Phase 7D evidence and architecture](PHASE7D.md) and the [acceptance gate](ACCEPTANCE.md#current-gate--phase-7d-review-prepared).
+**First real OKX Permit signing verified on Sepolia; Intent signing and swap settlement remain pending.**
+
+The Sepolia test-token claim is finalized and reconciled. Historical read-only discovery found **2 test USDC → XSGD** to be the smallest successful tested quote; later acceptance uses an explicitly selected **50 test USDC** request. The first real owner-approved OKX ERC-2612 Permit is now **cryptographically VERIFIED**, encrypted and persisted, separately from execution. [Phase 7M](PHASE7M.md) records the original digest, exact fields, read-only chain checks and next-stage blockers. Its Quote and Permit have expired; the signature and financial lock remain preserved and cannot be reused for another Quote. **Intent signing and swap settlement remain unverified; execution stays OFF.** A Permit is financial authorization even when swap execution is disabled; quote expiry alone does not revoke it, and an established allowance survives Permit expiry. See [current status](STATUS.md) for the separate earlier UNKNOWN/invalid requests and their immutable history.
 
 | Evidence | Scope |
 |---|---|
-| **LIVE TESTED** | Sera read-only markets, rates and quotes; Telegram mobile Mini App; OKX Web3 Wallet handoff, connection and backend ownership verification. |
+| **LIVE TESTED** | Sera read-only markets, rates and quotes; Telegram mobile Mini App; OKX Web3 Wallet handoff, connection, ownership verification and one exact 50-USDC Permit signature (now expired). |
 | **AUTOMATED TESTED** | Alerts/cooldowns/persistence, scanner, fresh quote callbacks, Korean NLU, analytics, wallet boundaries and trade safety/state machine. |
 | **NOT YET LIVE VERIFIED** | MetaMask real-device connection; Telegram Desktop wallet flow; actual Sepolia swap submission; end-to-end settlement. |
 | **DISABLED** | Execution in the development launcher, mainnet and automatic trading. |
+
+The earlier invalid October 11 callback remains retained separately; [Phase 7L](PHASE7L.md) corrected its missing wire-domain schema. The later successful Permit confirms that repair on mobile. The full trade path still needs Intent wire-domain and durable signature-state work, coordinated locks, and realistic timing validation before a separately authorized execution stage. No new signature is requested by Phase 7M.
 
 Telegram mobile + OKX Wallet connection and ownership verification were successfully owner-tested.
 This does not establish full wallet acceptance: the latest combined ownership tap, cancellation/recovery,
@@ -46,7 +50,7 @@ The real OKX mobile connection and ownership signature were verified. One owner-
 
 **TESTNET CLAIM VERIFICATION:** [successful Sepolia claim receipt](https://sepolia.etherscan.io/tx/0x0f71ead97bceb8e83b4de1e7b4eae9ef5a9f933f0f2cd5de25100c5d4a486448). This is funding evidence, **not a swap**. The explorer exposes public transaction participants; the active wallet is not repeated here.
 
-The latest bounded USDC/XSGD quote matrix found **2 test USDC** to be the smallest successful forward sample. Liquidity and costs can change; quote availability does not establish total market depth or guarantee execution. [Detailed results](PHASE7D.md#observed-liquidity-envelope) include both directions. Exact-amount ERC-2612 Permit, separate Sera Intent and relayer submission are prepared, with Korean/English review and **539 passing automated tests**. Real mobile financial signatures and swap settlement remain unverified.
+The latest bounded USDC/XSGD quote matrix found **2 test USDC** to be the smallest successful forward sample. Liquidity and costs can change; quote availability does not establish total market depth or guarantee execution. [Detailed results](PHASE7D.md#observed-liquidity-envelope) include both directions. Korean/English authorization review and the current **772-test suite** are verified. One real mobile 50-USDC Permit is verified; Intent signing, relayer submission and swap settlement remain pending with documented implementation blockers.
 
 | Feature | Verification status |
 |---|---|
@@ -56,7 +60,7 @@ The latest bounded USDC/XSGD quote matrix found **2 test USDC** to be the smalle
 | Sepolia faucet claim / balance reconciliation | Finalized and verified on-chain |
 | USDC → XSGD executable quote | Observed at 2/5/10/25/50/100 test USDC; time-specific evidence |
 | Permit / Intent review | Implemented; automated tests verified |
-| Real Permit / Intent mobile signatures | Pending |
+| Real Permit / Intent mobile signatures | First valid 50-USDC Permit independently verified and encrypted; expired package retained and locked. Intent pending. See [Phase 7M](PHASE7M.md). |
 | Relayer submission / real Sera swap settlement | Pending |
 | MetaMask / Telegram Desktop acceptance | Pending |
 | Stable production deployment | Pending |
@@ -319,7 +323,7 @@ Public **original repository**, not a fork: [sunmool25x/fx-alert-bot](https://gi
 
 - Description: **Korean-first FX monitoring, alerts and Telegram trading interface powered by Sera Protocol.**
 - Topics applied: `built-on-sera`, `fx`, `sera`, `stablecoin`, `telegram-bot`, `typescript`, `web3`.
-- GitHub connected to Sera Community, as confirmed by the project maintainer.
+- Sera Community account linking and dashboard indexing are not verified by this publication task.
 - Daily XP sync: pending external verification. **+300 XP is not claimed.**
 - External star/fork qualification: pending; GitHub showed zero stars and forks on 2026-09-17.
 

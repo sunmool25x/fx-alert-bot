@@ -82,6 +82,14 @@ export class WalletFlow {
     if(this.current.environment!=="desktop")this.options.open(this.current,this.current.handoffUri);
   }
   claimReady(){return this.current?.choice==="okx"&&this.provider?.claimSupported===true;}
+  async renewOwnership(){
+    if(!this.current||!this.provider||!this.options.prepare){await this.choose();return;}
+    const connection=this.current,provider=this.provider,generation=this.generation,choice=connection.choice;
+    const guard=()=>{if(generation!==this.generation||connection!==this.current)throw new WalletFlowError('CONNECTION_LOST');connection.assert();};
+    this.show({step:'ownership',choice,busy:true});
+    try{guard();const prepared=await this.options.prepare(provider,guard);guard();this.prepared=prepared;this.show({step:'ownership',choice});}
+    catch(e){if(generation===this.generation)await this.fail(e);}
+  }
   private async fail(error:unknown,code?:string){
     const choice=this.screen.choice;this.retire();const generation=this.generation;
     const reason=code??(error instanceof WalletFlowError?error.code:"UNAVAILABLE");

@@ -1,6 +1,8 @@
 import { ClaimService } from "../claims/service.js";
 import { SepoliaClaimChain,claimClient,type ClaimChain } from "../claims/chain.js";
 import { ClaimError } from "../claims/protocol.js";
+import { acceptanceReview } from "../trades/acceptance-review.js";
+import {USDC,XSGD,same} from "../trades/contract.js";
 import { createServer,type IncomingMessage,type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -17,6 +19,8 @@ import { acceptanceLog } from "./diagnostics.js";
 import type { Hex } from "viem";
 import { createHash,randomUUID } from "node:crypto";
 import { entryFromOrigin } from "../analytics/types.js";
+import {continuationLog} from './continuation-log.js';
+import type{PermitService}from'../permits/service.js';
 const id=z.string().regex(/^[a-f0-9]{64}$/),signature=z.string().regex(/^0x[0-9a-fA-F]{130}$/);
 async function body(req:IncomingMessage) {
   if(req.headers["content-type"]!=="application/json")throw new AppError("AUTH_INVALID");
@@ -24,7 +28,7 @@ async function body(req:IncomingMessage) {
   for await(const chunk of req) {size+=chunk.length;if(size>20000)throw new AppError("AUTH_INVALID");chunks.push(chunk);}
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
 }
-export function signingServer(config:Config,store:Store,chain:ChainReads,trades:TradeService,now=Date.now,refresh?: (user:string)=>Promise<void>,claimChain?:ClaimChain) {
+export function signingServer(config:Config,store:Store,chain:ChainReads,trades:TradeService,now=Date.now,refresh?: (user:string)=>Promise<void>,claimChain?:ClaimChain,permits?:PermitService) {
   const claims=new ClaimService(store,claimChain??new SepoliaClaimChain(claimClient(config.wallet.rpc),now),config,now);
   const auth=new WalletAuth(store.wallet,config.wallet,a=>chain.eoa(a),now),limits=new Map<string,{at:number;count:number}>();
   const handler=async(req:IncomingMessage,res:ServerResponse)=>{
@@ -36,14 +40,15 @@ export function signingServer(config:Config,store:Store,chain:ChainReads,trades:
     res.setHeader("content-security-policy","default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; font-src 'self' https://fonts.reown.com; img-src 'self' data: https://*.walletconnect.com https://*.reown.com https://*.walletconnect.org https://api.web3modal.com https://api.web3modal.org; connect-src 'self' https://*.walletconnect.com wss://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.org https://*.reown.com wss://*.reown.com https://*.reown.org https://*.walletconnect.network https://api.web3modal.com https://api.web3modal.org; frame-src 'self' https://verify.walletconnect.com https://verify.walletconnect.org; frame-ancestors https://web.telegram.org; object-src 'none'; base-uri 'none'; form-action 'none'");
     try {
       const path=req.url??"";
+      const resource=path.split('?')[0]!;
       operation=path.startsWith("/api/")?path.slice(5):"request";
       if(req.method==="GET"&&path==="/api/health") {
         if(req.headers.host!==new URL(config.wallet.origin).host)throw new AppError("AUTH_INVALID");
-        send(200,{app:"sera-korea-fx-bot",origin:config.wallet.origin,chainId:config.chainId,executionEnabled:config.wallet.enabled,connectorReady:config.wallet.ready});return;
+        send(200,{app:"sera-korea-fx-bot",origin:config.wallet.origin,chainId:config.chainId,executionEnabled:config.wallet.enabled,permitOnlyEnabled:config.wallet.permitOnly,connectorReady:config.wallet.ready});return;
       }
-      if(req.method==="GET"&&["/","/app.js","/app.css","/okx-bridge.html","/okx-bridge.js","/wallet-icon.png","/THIRD_PARTY_LICENSES.txt"].includes(path)) {
-        if(path==="/okx-bridge.html")res.setHeader("content-security-policy","default-src 'none'; script-src 'self'; connect-src wss://wsdexpri.okx.com/ws/v1/wallet-connect-relay wss://wsdexpri.okx.ac/ws/v1/wallet-connect-relay wss://wsdexpri.coinall.ltd/ws/v1/wallet-connect-relay; img-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'");
-        const name=path==="/"?"index.html":path.slice(1);
+      if(req.method==="GET"&&["/","/app.js","/app.css","/okx-bridge.html","/okx-bridge.js","/wallet-icon.png","/THIRD_PARTY_LICENSES.txt"].includes(resource)) {
+        if(resource==="/okx-bridge.html")res.setHeader("content-security-policy","default-src 'none'; script-src 'self'; connect-src wss://wsdexpri.okx.com/ws/v1/wallet-connect-relay wss://wsdexpri.okx.ac/ws/v1/wallet-connect-relay wss://wsdexpri.coinall.ltd/ws/v1/wallet-connect-relay; img-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'");
+        const name=resource==="/"?"index.html":resource.slice(1);
         const file=await readFile(resolve("dist/web",name));
         res.setHeader("content-type",name.endsWith("html")?"text/html; charset=utf-8":name.endsWith("css")?"text/css":name.endsWith("png")?"image/png":name.endsWith("txt")?"text/plain; charset=utf-8":"text/javascript");res.end(file);return;
       }
@@ -60,13 +65,32 @@ export function signingServer(config:Config,store:Store,chain:ChainReads,trades:
         const session=store.wallet.newSession(user.id,telegram.hash,config.wallet.sessionMs);
         acceptanceLog("auth","TG_SESSION_CREATED",user.id);
         res.setHeader("set-cookie",`__Host-sera=${session.token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${config.wallet.sessionMs/1000}`);
-        send(200,{csrf:session.csrf,language,userId:user.id,projectId:config.wallet.projectId,origin:config.wallet.origin,ready:config.wallet.ready,claimEnabled:claims.available(user.id),enabled:config.wallet.enabled&&config.wallet.users.includes(user.id)});return;
+        const start=new URLSearchParams(initData).get('start_param');
+        send(200,{csrf:session.csrf,language,userId:user.id,projectId:config.wallet.projectId,origin:config.wallet.origin,ready:config.wallet.ready,claimEnabled:claims.available(user.id),permitOnly:permits?.available(user.id)??false,enabled:config.wallet.enabled&&config.wallet.users.includes(user.id),startParam:start&&/^[A-Za-z0-9_-]{11}$/.test(start)?start:undefined});return;
       }
       const token=req.headers.cookie?.match(/(?:^|;\s*)__Host-sera=([a-f0-9]{64})(?:;|$)/)?.[1];
       const s=token?store.wallet.session(token):undefined;if(!s)throw new AppError("AUTH_STALE");
       language=(await store.user(s.user_id))?.language??"ko";
       userRef=s.user_id;walletRef=s.wallet??undefined;
       auth.csrf(s,String(req.headers["x-csrf-token"]??""));
+      if(path.startsWith('/api/permit/')){
+        if(!permits)throw new AppError('PERMIT_DISABLED');
+        // Best-effort stage observations cannot consume the financial result-persistence budget.
+        const k=s.user_id+(path==='/api/permit/observation'?'/permit-observation':'/permit'),b=limits.get(k);if(!b||now()-b.at>=60000)limits.set(k,{at:now(),count:1});else if(++b.count>12)throw new AppError('RATE_LIMITED');
+        if(path==='/api/permit/status'){z.object({}).strict().parse(data);send(200,{available:permits.available(s.user_id),review:permits.available(s.user_id)?permits.status(s,language):null});return;}
+        if(path==='/api/permit/prepare'){const d=z.object({intent:z.string().regex(/^[A-Za-z0-9_-]{11}$/)}).strict().parse(data);send(200,await permits.prepare(s,d.intent,language));return;}
+        if(path==='/api/permit/request'){const d=z.object({id,version:id,consent:z.literal(true)}).strict().parse(data);send(200,await permits.request(s,d.id,d.version,language));return;}
+        if(path==='/api/permit/observation'){const d=z.object({id,version:id,kind:z.enum(['RPC_DISPATCHED','SDK_INVOKED','SDK_RETURNED','HANDOFF_REQUESTED','HANDOFF_FAILED','HANDOFF_REOPENED','CALLBACK_RECEIVED','CLIENT_QUOTE_STALE','CLIENT_OWNERSHIP_EXPIRED','CLIENT_PRE_DISPATCH_REJECTED'])}).strict().parse(data);send(200,permits.observation(s,d.id,d.version,d.kind));return;}
+        if(path==='/api/permit/record'){const d=z.object({id,version:id,signature:z.string().max(264).optional(),responseKind:z.enum(['EMPTY','OBJECT','OTHER']).optional()}).strict().refine(v=>(v.signature!==undefined)!==(v.responseKind!==undefined)).parse(data);send(200,await permits.record(s,d.id,d.version,d.signature??null,language));return;}
+        if(path==='/api/permit/failure'){const d=z.object({id,version:id,code:z.enum(['USER_REJECTED','WALLET_TIMEOUT','WALLET_TRANSPORT_ERROR','INVALID_PERMIT','WALLET_REQUIRED','QUOTE_STALE']),rpc:z.number().int().min(-2147483648).max(2147483647).nullable()}).strict().parse(data);send(200,permits.fail(s,d.id,d.version,d.code,d.rpc,language));return;}
+        throw new AppError('PERMIT_DISABLED');
+      }
+      if(path==='/api/bootstrap'){
+        const d=z.object({initData:z.string().max(12000)}).strict().parse(data),telegram=validateTelegram(d.initData,config.botToken,now());
+        if(telegram.user!==s.user_id)throw new AppError('AUTH_INVALID');
+        const start=new URLSearchParams(d.initData).get('start_param');continuationLog('BOOTSTRAP','OK',s.user_id);
+        send(200,{language,userId:s.user_id,projectId:config.wallet.projectId,origin:config.wallet.origin,ready:config.wallet.ready,claimEnabled:claims.available(s.user_id),permitOnly:permits?.available(s.user_id)??false,enabled:config.wallet.enabled&&config.wallet.users.includes(s.user_id),startParam:start&&/^[A-Za-z0-9_-]{11}$/.test(start)?start:undefined});return;
+      }
       if(["/api/preview","/api/prepare","/api/challenge","/api/submit","/api/refresh","/api/diagnostic","/api/claim/prepare","/api/claim/confirm","/api/claim/refresh","/api/claim/report","/api/claim/preview"].includes(path)) {
         const k=s.user_id+path,b=limits.get(k);
         if(!b||now()-b.at>=60000)limits.set(k,{at:now(),count:1});else if(++b.count>6)throw new AppError("RATE_LIMITED");
@@ -78,7 +102,7 @@ export function signingServer(config:Config,store:Store,chain:ChainReads,trades:
       if(path==="/api/claim/rejected") {const d=z.object({id}).strict().parse(data);send(200,claims.rejected(s,d.id));return;}
       if(path==="/api/claim/cancel") {const d=z.object({id}).strict().parse(data);send(200,claims.cancel(s,d.id));return;}
       if(path==="/api/claim/refresh") {const d=z.object({id}).strict().parse(data);send(200,await claims.refresh(s,d.id));return;}
-      if(path==="/api/claim/preview") {const d=z.object({id}).strict().parse(data);const intent=await claims.firstSwapIntent(s,d.id);send(200,previewView(await trades.preview(s,intent),language));return;}
+      if(path==="/api/claim/preview") {const d=z.object({id,amount:z.literal('2').optional()}).strict().parse(data);const intent=await claims.firstSwapIntent(s,d.id,d.amount??'1');const p=await trades.preview(s,intent);send(200,d.amount==='2'?acceptanceReview(p,language):previewView(p,language));return;}
       if(path==="/api/state"||path==="/api/refresh") {
         z.object({}).strict().parse(data);
         if(path==="/api/refresh"){await refresh?.(s.user_id);acceptanceLog("refresh","OK",userRef,walletRef);}
@@ -118,8 +142,31 @@ export function signingServer(config:Config,store:Store,chain:ChainReads,trades:
         const provenance=store.analytics.quoteContext(s.user_id,d.intent);
         const context={...provenance,origin:"button" as const,key:randomUUID()};
         if(provenance){store.analytics.activity(s.user_id,context);store.analytics.record(s.user_id,"quote_requested",context);}
-        const p=await trades.preview(s,d.intent);acceptanceLog("preview","OK",userRef,walletRef);send(200,previewView(p,language));
+        if(store.continuations.cancelled(d.intent,s.user_id))throw new AppError('TRADE_STATE');
+        let p;
+        try{p=await trades.preview(s,d.intent);continuationLog('FRESH_QUOTE','OK',s.user_id,d.intent);}
+        catch(e){continuationLog('FRESH_QUOTE','REJECTED',s.user_id,d.intent);throw e;}
+        const view=acceptanceReview(p,language);
+        const intent=await store.intent(d.intent,s.user_id);if(!intent)throw new AppError('TRADE_STATE');store.continuations.ensure(intent);
+        store.continuations.reviewed(d.intent,s.user_id,s.id,store.wallet.current(s).epoch);continuationLog('REVIEWED','OK',s.user_id,d.intent);
+        acceptanceLog("preview","OK",userRef,walletRef);send(200,view);
         if(provenance)store.analytics.record(s.user_id,"fresh_quote_viewed",{...context,entityId:d.intent});return;
+      }
+      // Presentation context only: owner-bound, unexpired and never a default amount.
+      if(path==="/api/context") {
+        const d=z.object({intent:z.string().regex(/^[A-Za-z0-9_-]{11}$/).optional()}).strict().parse(data);
+        if(d.intent){const original=await store.intent(d.intent,s.user_id);if(original)store.continuations.ensure(original);}
+        const intent=d.intent?store.continuations.get(d.intent,s.user_id):store.continuations.pending(s.user_id);
+        if(!intent||!(await store.intent(intent.id,s.user_id))){continuationLog('LOOKUP','REJECTED',s.user_id,d.intent);throw new AppError('TRADE_STATE');}
+        continuationLog('LOOKUP',d.intent?'OK':'RECOVERED',s.user_id,intent.id);
+        send(200,{id:intent.id,amount:intent.amount,fromSymbol:same(intent.from_token,USDC)?'USDC':intent.from_token,toSymbol:same(intent.to_token,XSGD)?'XSGD':intent.to_token,chainId:intent.chain_id,recipientMode:intent.recipient_mode,createdAt:intent.created_at,expiresAt:intent.expires_at,state:intent.state});return;
+      }
+      if(path==='/api/context/cancel'){
+        const d=z.object({intent:z.string().regex(/^[A-Za-z0-9_-]{11}$/)}).strict().parse(data);store.continuations.cancel(d.intent,s.user_id);continuationLog('CANCELLED','OK',s.user_id,d.intent);send(200,{ok:true});return;
+      }
+      if(path==='/api/context/diagnostic'){
+        const d=z.object({stage:z.enum(['BOOTSTRAP','OWNERSHIP_RETURN']),hasRoute:z.boolean()}).strict().parse(data);
+        continuationLog(d.stage,d.hasRoute?'OK':'MISSING',s.user_id);send(200,{ok:true});return;
       }
       if(path==="/api/confirm") {const d=z.object({id,version:id}).strict().parse(data);send(200,trades.confirm(s,d.id,d.version));return;}
       if(path==="/api/cancel") {const d=z.object({id}).strict().parse(data);trades.cancel(s,d.id);send(200,{ok:true});return;}

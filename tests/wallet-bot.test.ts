@@ -33,7 +33,7 @@ for(const language of ["ko","en"] as const)test(language+" wallet, actual balanc
     assert(views.at(-1)!.buttons!.flat().some(b=>b.webApp==="https://bot.example"));
     await bot.handle({userId:"1",text:"/balance"},out);assert.match(views.at(-1)!.text,/USDC: 1000/);assert.match(views.at(-1)!.text,/Vault/);
     for(const command of ["/quote 100 USDC EURC","/swap 100 USDC EURC"]){await bot.handle({userId:"1",text:command},out);const entry=views.at(-1)!.buttons!.flat().find(b=>b.data.startsWith("trade:"))!;assert(entry);
-      await bot.handle({userId:"1",callback:entry.data},out);assert.match(views.at(-1)!.buttons![0]![0]!.webApp!,/^https:\/\/bot.example\/#intent=/);
+      await bot.handle({userId:"1",callback:entry.data},out);assert.match(views.at(-1)!.buttons![0]![0]!.webApp!,/^https:\/\/bot.example\/\?intent=/);
       await bot.handle({userId:"2",callback:entry.data},out);assert(!views.at(-1)!.buttons);}
     assert.equal(f.submitted(),0);f.config.wallet.enabled=false;await bot.handle({userId:"1",text:"/swap"},out);assert.match(views.at(-1)!.text,language==="ko"?/조회 모드/:/Read-only/);
     await bot.handle({userId:"1",callback:"wallet:disconnect"},out);assert.equal(f.store.wallet.address("1"),undefined);

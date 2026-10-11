@@ -8,6 +8,8 @@ export function ownedChild(command:string,args:string[],cwd:string,env:NodeJS.Pr
   const child=spawn(command,args,{cwd,env,shell:false,windowsHide:true,stdio:ipc?["ignore","pipe","pipe","ipc"]:["ignore","pipe","pipe"]});
   void finished(child);return child;
 }
+/** Consume validation output without exposing test/provider logs or filling OS pipe buffers. */
+export function discardOutput(child:ChildProcess) {child.stdout?.resume();child.stderr?.resume();}
 export function lines(child:ChildProcess,receive:(line:string)=>void) {
   for(const stream of [child.stdout,child.stderr]) {
     let buffer="";stream?.setEncoding("utf8");stream?.on("data",(chunk:string)=>{

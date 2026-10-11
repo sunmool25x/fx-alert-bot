@@ -1,6 +1,76 @@
 # Implementation status
 
-## Current — Phase 7D review prepared, 2026-09-17 KST
+## Current — Phase 7M real mobile Permit VERIFIED; execution remains blocked, 2026-10-11 KST
+
+The first successful owner-approved OKX ERC-2612 Permit is independently **VERIFIED** from its original encrypted callback and persisted signature. Canonical recovery, original digest, exact 50-USDC amount, token, owner, spender, Sepolia domain and nonce all match. Both ciphertext copies are authenticated and retained. The quote expired at 04:17:14 UTC and Permit/unsigned Intent at 04:21:43 UTC. The row remains `PERMIT_SIGNED`; its lock and complete history are preserved, with no retirement or reuse. See [PHASE7M.md](PHASE7M.md).
+
+Two read-only RPCs agree on nonce 0 / allowance 0 and find no approval, owner token movement or SOR settlement in the bounded attempt interval. There are zero persisted trade sessions/submission attempts. This verifies mobile **Permit signing only**, not Intent signing or on-chain execution. The existing funding claim is preserved. No new quote, wallet request, Intent, relayer call or transaction was initiated. Mainnet and swap execution stay OFF.
+
+The existing full-trade path needs explicit Intent wire-domain validation, durable handling of late/unknown signature results, shared authorization locks/cost checks and measured two-signature timing before activation. This Permit took 12.221 seconds from review to persistence, leaving 12.078 seconds before the existing five-second submission margin. Reliable end-to-end mobile completion is not established. The next owner step is review of the documented implementation plan, not another financial request.
+
+Relevant tests 217/217 and full tests 772/772 pass; typecheck/build pass. Audit reports 3 moderate entries, zero high/critical, no available fixes. Financial/business source, configuration and tests are unchanged in this phase; validation and read-only evidence are recorded in the Phase 7M report.
+
+## Historical — Phase 7L missing wire domain diagnosed and fixed, 2026-10-11 KST
+
+The October 11 request is separate from September's retired UNKNOWN request. Its encrypted callback was retained and is invalid for the intended USDC Permit: recovery matches the owner only with an empty EIP-712 domain schema. The OKX object lacked `types.EIP712Domain`; the server correctly rejected the resulting signature before quote expiry. The wire adapter now supplies the canonical domain schema and requires the same intended digest. Amount, spender, nonce, deadlines, chain, financial method and Intent architecture are unchanged. See [PHASE7L.md](PHASE7L.md) for the correlated IDs, timestamps and cryptographic evidence.
+
+772/772 tests, typecheck and build pass. The new tests exercise actual SDK serialization using a strict JSON-RPC wallet fixture, rather than signing a different canonical backend object. Callback evidence stays encrypted and owner-scoped. Reservation/SDK invocation are distinct from wallet receipt; rejected capture refreshes authoritative status without another request. A narrow, explicit retirement path for this retained invalid-domain response requires all existing expiry/authority checks and preserves original records. It does not classify the response as absent or UNKNOWN. No new live signature, quote, Intent, relayer call or transaction was initiated. Mainnet and swap execution remain OFF. September's immutable retirement remains unchanged.
+
+After the common finalized block passed the October deadline, current code/domain/nonce/allowance and pending-state gates all passed. At `2026-10-11T03:20:57.609Z`, only the October lock was retired as `EXPIRED_INVALID_SIGNATURE_NO_ACTIVE_AUTHORITY`. The original invalid signature result and ciphertext remain intact; one retirement event was appended. A new owner-initiated `/quote 50 USDC XSGD` still requires renewed ownership, fresh quote/nonce/deadline and consent. No new live attempt was made.
+
+## Historical — Phase 7K expired UNKNOWN Permit retired with verified zero authority, 2026-10-11 KST
+
+The historical signature result remains **UNKNOWN**. Two independent Sepolia RPCs agreed on finalized block `11888720` and latest block `11888816`: token nonce `0`, owner/spender allowance `0`. Direct inspection of the pinned deployed runtime verifies that an expired ERC-2612 Permit reverts before signature recovery or authorization changes. The bounded Approval history is partial and does not establish whether an off-chain signature existed. See [PHASE7K.md](PHASE7K.md) for evidence and limitations.
+
+After all retirement gates passed, an atomic, append-only `EXPIRED_RESULT_UNKNOWN_NO_ACTIVE_AUTHORITY` record retired only the old request's blocking effect. Original Permit rows/reviews/results/events, wallet records, continuations and successful funding history match the pre-change backup; one retirement event was appended. The old request remains permanently non-reusable. A new request requires explicit owner initiation, ownership renewed after retirement, a new continuation and fresh quote/nonce/deadline with all existing financial gates.
+
+744/744 tests, typecheck, build, database integrity and Gitleaks pass. Dependency audit reports 3 moderate entries, 0 high/critical, with no available fixes. The existing tunnel and launcher were preserved; the backend reloaded through the managed workflow and live preflight passed. No new Quote, Permit request, Intent, relayer call, transaction or allowance revocation was initiated. Mainnet and swap execution remain OFF; existing safety configuration is unchanged.
+
+## Historical — Permit expiry/handoff repaired; historical result remains locked, 2026-09-20 KST
+
+The later owner attempt received a callback before quote expiry, then failed local response validation before persistence. Signature bytes were not retained, so its result is UNKNOWN; its original database row and lock remain intact. The separate earlier QUOTE_STALE log cannot be matched to a retained quote ID. See [PERMIT_EXPIRY.md](PERMIT_EXPIRY.md) for the correlated timeline and evidence limits.
+
+The existing Permit panel now groups review/consent/action, exposes expiry and explicit refresh with renewed consent, shows pending progress, and opens the same OKX request without resend. Original callback evidence is encrypted before cryptographic verification, with expiry and chain status recorded separately. Migration 12 preserves state and archives future review versions. 687/687 tests, typecheck and build pass; mobile-sized browser checks used mocks only. No new live signing request, Intent, relayer call, native transaction or swap is made. Mainnet and swap execution remain OFF. The unresolved historical attempt is not cleared or retried.
+
+## Historical — Phase 7J Permit transport failure reconciled; stop before retry, 2026-09-19 KST
+
+The first real Permit request hit OKX Connect 1.9.1's object-versus-JSON-string parameter check before wallet dispatch. Reproduction with the historical payload and installed SDK made zero wallet transport calls and returned the persisted code `0`; no signature was produced or stored. The minimal SDK-boundary conversion preserves the exact Permit digest. See [PHASE7J.md](PHASE7J.md) for evidence, timestamp limits, read-only contract verification and guarded no-signature closure.
+
+673/673 tests, typecheck and build pass. Migration 11 preserves the old request and introduces explicit closed-no-signature history while unknown/signed requests stay locked. Any future attempt requires ownership refreshed after closure, a new continuation and fresh fifty-USDC quote, existing financial checks and new explicit consent. No live retry, Intent, relayer submission, swap or new claim is initiated. Mainnet and swap execution remain OFF. The next owner action is a completely new fifty-USDC Quote/Permit review, stopping to show the screen before signing.
+
+## Historical — Phase 7I fresh-Quote navigation repaired; stop before signing, 2026-09-19 KST
+
+A separate, default-OFF acceptance capability prepares a new exact fifty-USDC quote, applies the existing cost/contract/ownership checks, and permits one explicit OKX ERC-2612 signature. Atomic server reservation prevents repeated requests; verified signatures are encrypted locally as PERMIT_SIGNED. No Intent signing or relayer transport is exposed by this capability, and mainnet/swap execution remain OFF. Migration 10 preserves existing state with a consistent backup. See [PHASE7I.md](PHASE7I.md).
+
+651/651 tests, typecheck and build pass. The owner's primary Quote action previously remained on the read-only endpoint despite Permit-only being enabled. It now prepares a new exact fifty-USDC quote and focuses the Permit review with a visible, explicit single-signature button. Quote, ownership, continuation and Permit expiry disable signing; old read-only quotes cannot be promoted. The prior mobile review and proof are expired historical evidence. The next owner action is a new `/quote 50 USDC XSGD` continuation, ordinary ownership verification if needed, then **새 Quote · Permit 전용 검토**, stopping before any signing. No live signature or transaction is claimed. Mainnet and swap execution remain OFF.
+
+## Historical — Phase 7H durable exact-amount continuation, 2026-09-19 KST
+
+Validated Telegram requests now persist independently of their short-lived public quotes. Explicit continuation selects an owner-bound server record, carried by an opaque query ID with a selected-request recovery path. The Mini App resumes its authenticated session on reload, restores the same request after ownership verification, and keeps it through quote expiry. Cancellation and the original fifteen-minute TTL remain terminal; unknown or foreign IDs never fall back to another request. See [PHASE7H.md](PHASE7H.md) for observed failure evidence and diagnostic limits.
+
+609/609 tests, typecheck and build pass. Exact fifty-USDC end-to-end coverage uses isolated mocks; the owner's fresh mobile quote/review is still pending and historical Phase 7G values are not reused. Mainnet and swap execution remain OFF. No Permit, Intent, relayer submission, swap or new claim is performed. The owner should reopen `/quote 50 USDC XSGD`, use the explicit continuation, verify ownership if requested, check the exact amount and request one fresh read-only review, stopping before financial signing.
+
+## Historical — Phase 7G explicit read-only continuation repaired, 2026-09-17 KST
+
+The Mini App now displays the explicit Telegram amount above claim history, keeps its owner-bound continuation across reload/ownership renewal, and fetches a fresh exact-amount quote only after a tap. The claim-completion CTA is generic; it no longer creates a two-USDC request. Loading/error/success states are visible. Generic previews include the unchanged cost gate, complete future authorization details and unsigned digests, with financial authorization disabled. See [PHASE7G.md](PHASE7G.md).
+
+596/596 tests, typecheck and build pass. One new operator-side 50-USDC read-only quote passed the existing gate at capture; it is expired evidence, not a completed owner mobile review. The managed live launcher restores service with current runtime origin. Mainnet and swap execution remain OFF; no financial signature, relayer submission or transaction is performed. The owner must reopen the explicit Telegram 50-USDC continuation for the actual fresh mobile review and stop before Permit.
+
+## Historical — Phase 7F economics characterized; no financial authorization, 2026-09-17 KST
+
+The owner reported the first authenticated two-USDC review correctly held at 89.1958% input-equivalent cost. Six new operator-only quotes at 09:46 UTC then succeeded for 2/5/10/25/50/100 USDC, with fresh ownership throughout. Absolute cost was identical across that matrix: 1.91129171122422 USDC equivalent and 2.446943 XSGD deducted. This supports a fixed-like cost component over the sampled sizes; it does not establish a universal fee or profit opportunity.
+
+The unchanged cost gate blocks 2 and passes 5/10/25/50/100. Smallest below 20%: 10; below 10%: 25; below 5%: 50. **50 test USDC** is suggested only for a future explicitly selected fresh review; 5 remains the minimum passing the current gate. All samples are expired, non-signable evidence. No application amount, policy, wallet/claim state, financial source or execution gate was changed. See [PHASE7F.md](PHASE7F.md) for exact fields, tables, limitations and the existing owner path. Permit, Intent, relayer and swaps remain unperformed; mainnet and swap execution remain OFF.
+
+## Historical — Phase 7E review prepared; live verification pending, 2026-09-17 KST
+
+The claim-success Mini App action now explicitly requests **2 test USDC → XSGD**, without resizing an old one-USDC request. The read-only review separates minimum output, input-equivalent cost and output deduction, adds unsigned Permit/Intent digests and an expiry countdown, and holds extreme or unverifiable economics. No financial authorization controls are available. Details and limitations are in [PHASE7E.md](PHASE7E.md).
+
+Ownership initially passed, then the existing session expired at 09:23:30 UTC. No owner-initiated fresh quote was obtained; live quote terms and the actual phone review remain unverified. Mainnet and swap execution remain OFF. No financial signature, relayer submission, swap, completion commit or push occurred. Existing claim and database state are preserved. This is preparation, not completed financial acceptance.
+
+The larger test output exposed an existing launcher pipe-buffer stall during automatic reload. Validation output is now drained without disclosure, with a regression test. The normal launcher was restarted to load that repair, creating a fresh temporary origin; the owner must use the current Telegram `/wallet` entry. See the separate runtime-repair note in PHASE7E.md.
+
+## Historical — Phase 7D review prepared, 2026-09-17 KST
 
 Twenty paced, read-only quotes establish **B — EXECUTABLE_AT_LARGER_SIZE**: forward successes at 2/5/10/25/50/100 USDC; reverse successes at 5/10/25/50/100 XSGD. Select **2 test USDC → XSGD**, the smallest successful tested amount, without changing any saved user intent or enabling execution. No fallback is needed. All sampled quotes have short lifetimes and are not reusable authorizations.
 
@@ -62,7 +132,7 @@ Publication hygiene scan: SAFE, 161 candidate files / 2 commits / 635 versions. 
 
 ## Historical — public README and verification status, 2026-09-17 KST
 
-Public original repository: [sunmool25x/fx-alert-bot](https://github.com/sunmool25x/fx-alert-bot). GitHub API verification confirms public visibility, `fork=false`, default branch `main`, the configured Sera description and all seven topics including `built-on-sera`. GitHub was connected to Sera Community according to the maintainer's update. The API showed zero stars/forks at this check; external qualification and daily XP sync remain pending/unverified. No +300 XP credit is claimed.
+Public original repository: [sunmool25x/fx-alert-bot](https://github.com/sunmool25x/fx-alert-bot). GitHub API verification confirms public visibility, `fork=false`, default branch `main`, the configured Sera description and all seven topics including `built-on-sera` at the original publication check. Sera Community account linking and dashboard indexing are not independently verified. The API showed zero stars/forks at that historical check; external qualification and daily XP sync remain pending/unverified. No +300 XP credit is claimed.
 
 **LIVE TESTED:** Sera read-only markets/rates/quotes; Telegram mobile Mini App launch; official OKX Web3 Wallet handoff and connection; successful backend ownership verification on mobile. **NOT YET LIVE VERIFIED:** MetaMask real-device connection, Telegram Desktop wallet flow, actual Sepolia swap submission and complete settlement. Mainnet and development execution remain OFF. Specific new ownership-tap/UX/recovery cases remain separate unchecked regression items in ACCEPTANCE.md; mobile connection success is not blanket wallet acceptance.
 

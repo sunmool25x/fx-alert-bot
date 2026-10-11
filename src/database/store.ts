@@ -13,6 +13,10 @@ import type { ActionOrigin } from "../nlu/parser.js";
 import { AnalyticsStore } from "../analytics/store.js";
 import { migrateAnalytics } from "./analytics-migration.js";
 import type { Entry } from "../analytics/types.js";
+import {ContinuationStore,migrateContinuations} from './continuations.js';
+import {continuationLog} from '../wallet/continuation-log.js';
+import{PermitStore,migratePermits,migratePermitReconciliation,migratePermitEvidence,migratePermitRetirements}from'./permits.js';
+import{migrateInvalidPermitRetirement}from'./permit-domain-migration.js';
 
 export type Language = "ko" | "en";
 export interface User { id: string; language: Language; source: string | null; created_at: number; last_seen_at: number }
@@ -27,6 +31,8 @@ export interface Flow {
 }
 export interface QuoteIntent { id: string; user_id: string; from_token: string; to_token: string; amount: string; expires_at: number; origin:string }
 export interface Store {
+  readonly permits:PermitStore;
+  readonly continuations:ContinuationStore;
   readonly analytics:AnalyticsStore;
   readonly inputOrigins:InputOrigins;
   readonly wallet: WalletStore;
@@ -45,6 +51,8 @@ export interface Store {
 }
 export const shortId = () => randomBytes(8).toString("base64url");
 export class SqliteStore implements Store {
+  readonly permits:PermitStore;
+  readonly continuations:ContinuationStore;
   readonly analytics:AnalyticsStore;
   readonly inputOrigins:InputOrigins;
   readonly wallet: WalletStore;
@@ -106,6 +114,31 @@ export class SqliteStore implements Store {
     migrateAnalytics(this.db,now());
     this.analytics=new AnalyticsStore(this.db,now);
     this.wallet = new WalletStore(this.db,now,()=>this.analytics.reconcile());
+    if(existed&&!this.db.prepare('SELECT 1 FROM schema_migrations WHERE version=9').get()){
+      const backup=path+'.before-phase7h-'+Date.now()+'-'+shortId()+'.sqlite';
+      this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
+    }
+    migrateContinuations(this.db);this.continuations=new ContinuationStore(this.db,now);
+    if(existed&&!this.db.prepare('SELECT 1 FROM schema_migrations WHERE version=10').get()){
+      const backup=path+'.before-phase7i-'+Date.now()+'-'+shortId()+'.sqlite';this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
+    }
+    migratePermits(this.db);
+    if(existed&&!this.db.prepare('SELECT 1 FROM schema_migrations WHERE version=11').get()){
+      const backup=path+'.before-phase7j-'+Date.now()+'-'+shortId()+'.sqlite';this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
+    }
+    migratePermitReconciliation(this.db);
+    if(existed&&!this.db.prepare('SELECT 1 FROM schema_migrations WHERE version=12').get()){
+      const backup=path+'.before-permit-evidence-'+Date.now()+'-'+shortId()+'.sqlite';this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
+    }
+    migratePermitEvidence(this.db);
+    if(existed&&!this.db.prepare('SELECT 1 FROM schema_migrations WHERE version=13').get()){
+      const backup=path+'.before-phase7k-'+Date.now()+'-'+shortId()+'.sqlite';this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
+    }
+    migratePermitRetirements(this.db);
+    if(existed&&!this.db.prepare('SELECT 1 FROM schema_migrations WHERE version=14').get()){
+      const backup=path+'.before-phase7l-'+Date.now()+'-'+shortId()+'.sqlite';this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
+    }
+    migrateInvalidPermitRetirement(this.db);this.permits=new PermitStore(this.db,now);
   }
   async touch(id: string, source?: string): Promise<User> {
     if (!/^\d{1,20}$/.test(id)) throw new Error("Invalid user reference");
@@ -138,6 +171,7 @@ export class SqliteStore implements Store {
     const id = shortId();
     this.db.prepare("INSERT INTO quote_intents VALUES(?,?,?,?,?,?,?)")
       .run(id, user, from, to, amount, this.now() + this.ttlMs,origin);
+    this.continuations.ensure((await this.intent(id,user))!,this.now());continuationLog('RECORDED','OK',user,id);
     if(inputOrigin)this.inputOrigins.set("quote",id,inputOrigin);
     return id;
   }
@@ -145,6 +179,6 @@ export class SqliteStore implements Store {
     return this.db.prepare("SELECT * FROM quote_intents WHERE id=? AND user_id=? AND expires_at>?")
       .get(id, user, this.now()) as unknown as QuoteIntent | undefined;
   }
-  async forget(id: string) { this.claims.forget(id); this.wallet.forget(id); this.db.prepare("DELETE FROM users WHERE id=?").run(id); }
+  async forget(id: string) { this.permits.forget(id); this.claims.forget(id); this.wallet.forget(id); this.db.prepare("DELETE FROM users WHERE id=?").run(id); }
   close() { this.db.close(); }
 }

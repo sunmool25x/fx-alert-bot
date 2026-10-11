@@ -100,11 +100,12 @@ export class ClaimService {
     }
     return this.view(this.store.claims.row(id,user)!);
   }
-  async firstSwapIntent(s:Session,id:string){
+  async firstSwapIntent(s:Session,id:string,amount:'1'|'2'='1'){
+    claimAssert(amount==='1'||amount==='2','CLAIM_INVALID');
     const r=this.owned(s,id);claimAssert(r.state==='CLAIM_BALANCES_VERIFIED'&&r.tx_hash&&r.payload&&r.evidence,'CLAIM_BALANCES_FAILED');
-    // Check canonical evidence again before allowing the read-only one-USDC preview.
+    // Legacy pages keep one USDC; the new button explicitly requests two. Never resize a request.
     claimAssert((await this.chain.receipt(r.wallet,r.tx_hash as Hex,JSON.parse(r.payload),JSON.parse(r.evidence))).state==='verified','CLAIM_BALANCES_FAILED');this.owner(s);
     const {USDC,XSGD}=await import('../trades/contract.js');
-    return this.store.saveIntent(s.user_id,USDC,XSGD,'1','wallet');
+    return this.store.saveIntent(s.user_id,USDC,XSGD,amount,'wallet');
   }
 }

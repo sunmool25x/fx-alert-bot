@@ -47,7 +47,7 @@ test("NL quote preserves precision, gets a fresh quote every time and retains re
 test("swap language prepares the same quote and only offers existing manual wallet continuation",async()=>{
   const f=setup();try{await f.text("USDC 5개 XSGD로 바꾸고 싶어");assert.equal(f.calls.length,1);assert.equal(f.calls[0]!.amount,"5");assert.match(f.last().text,/최신 Quote/);assert.equal(f.c.wallet.enabled,false);assert.equal(f.c.network,"sepolia");
     const intent=await f.store.intent(f.button("refresh:").slice(8),"1");assert.equal(intent!.origin,"swap");assert.equal(f.store.wallet.address("1"),undefined);assert.deepEqual(f.store.wallet.list("1"),[]);
-    const trade=f.button("trade:");await f.callback(trade);assert.match(f.last().buttons![0]![0]!.webApp!,/^https:\/\/bot.example\/#intent=/);assert.deepEqual(f.store.wallet.list("1"),[]);
+    const trade=f.button("trade:");await f.callback(trade);assert.match(f.last().buttons![0]![0]!.webApp!,/^https:\/\/bot.example\/\?intent=/);assert.deepEqual(f.store.wallet.list("1"),[]);
     await f.text("자동으로 거래 실행하고 서명해줘");assert.deepEqual(f.store.wallet.list("1"),[]);assert.equal(f.calls.length,1);
   }finally{f.store.close();}
 });
