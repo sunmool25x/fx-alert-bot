@@ -31,6 +31,8 @@ export class SettlementMonitor {
           requireThat(hashes(d,q).version===row.version,"QUOTE_BINDING_MISMATCH");
           const result=await this.chain.settle(d,q,hashes(d,q).struct,BigInt(row.cursor_block!));
           if(result.evidence) {
+            const e=result.evidence,b=e.balances;
+            requireThat(e.rpcAgreement===true&&b&&BigInt(b.inputBefore)-BigInt(b.inputAfter)===BigInt(e.inputRaw)&&BigInt(b.outputAfter)-BigInt(b.outputBefore)===BigInt(e.outputRaw)&&BigInt(e.inputRaw)>0n&&BigInt(e.inputRaw)<=BigInt(q.route_params.maxInputAmount)&&BigInt(e.outputRaw)>=BigInt(q.route_params.minOutputAmount)&&e.intentHash===hashes(d,q).struct,'UNAVAILABLE');
             this.store.transition(row.id,["PENDING","UNKNOWN","UNKNOWN_REORG"],"CONFIRMED",{evidence:JSON.stringify(result.evidence),tx_hash:result.evidence.txHash,error_code:null,notified:0});
             row.state="CONFIRMED";row.tx_hash=result.evidence.txHash;row.evidence=JSON.stringify(result.evidence);row.notified=0;
           }

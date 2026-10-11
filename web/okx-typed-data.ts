@@ -1,5 +1,6 @@
 import{hashTypedData,type TypedDataDefinition}from'viem';
 import{WalletFlowError}from'./connection.js';
+import {intentRpcData} from '../src/trades/intent-protocol.js';
 import{permitRpcData}from'../src/permits/protocol.js';
 /** EIP-1193 uses a JSON string; OKX Connect 1.9.1's array adapter requires an object. */
 export function okxTypedDataRequest(args:{method:string;params:unknown[]},owner:string){
@@ -11,6 +12,7 @@ export function okxTypedDataRequest(args:{method:string;params:unknown[]},owner:
   if(data.primaryType==='Permit'&&data.message.owner?.toLowerCase()!==owner.toLowerCase())throw new WalletFlowError('WALLET_REQUIRED');
   // Keep the financial digest; explicitly declare its domain for JSON-RPC wallets.
   if(data.primaryType==='Permit')data=permitRpcData(data,owner);
+  else if(data.primaryType==='Intent')data=intentRpcData(data,owner);
   try{hashTypedData(data as TypedDataDefinition);}catch{throw new WalletFlowError('INVALID_PERMIT');}
   return{method:args.method,params:[args.params[0],data]};
 }

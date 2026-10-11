@@ -1,3 +1,4 @@
+import {tradeAuthorizationPanel} from './trade-panel.js';
 import { claimPanel } from "./claim-panel.js";
 import { reviewClock } from "./review-clock.js";
 import { renderTradeReview } from "./trade-review.js";
@@ -19,7 +20,7 @@ type Review={id:string;version:string;state:string;expiresAt:number;text:string;
 const route=continuationRoute(location.hash,location.search);
 let continuation:TradeContinuation|undefined,restoreContext:()=>Promise<void>=async()=>{},quoteAction:ReturnType<typeof quoteRequestButton>|undefined;
 let language:"ko"|"en"="ko",csrf="",wallet="",provider:ConnectedProvider|undefined;
-let active:Review|undefined,authorized:{intent:unknown;permit:unknown;version:string}|undefined,permitSignature="",intentSignature="";
+let active:Review|undefined,financialPanel:ReturnType<typeof tradeAuthorizationPanel>|undefined;let financialHandoff=()=>{};
 let accountEpoch=0,busy=false,allowExecution=false;
 let authenticatedUser="",walletPending=false;
 let ownershipLock:object|undefined;
@@ -37,7 +38,7 @@ async function api(path:string,body:unknown={}) {
 }
 const diagnostic=(code:string)=>{void api("diagnostic",{code,...(code==="WALLET_CONNECT_STARTED"?{eventId:crypto.randomUUID()}: {})}).catch(()=>undefined);};
 function failure(e:unknown){const code=e instanceof WalletFlowError?safeWalletCode(e.code):"UNAVAILABLE";console.warn("wallet_ui",code);message(walletError(language,code));}
-function clearAuthorization() {authorized=undefined;permitSignature="";intentSignature="";}
+function clearAuthorization() {financialPanel=undefined;}
 function button(parent:string,text:string,action:()=>Promise<void>,primary=false) {
   const b=document.createElement("button");b.textContent=text;if(primary)b.className="primary";
   b.onclick=async()=>{if(busy)return;busy=true;b.disabled=true;try{await action();}catch(e){failure(e);}finally{busy=false;b.disabled=b.dataset.done==="true";}};el(parent).append(b);return b;
@@ -51,40 +52,14 @@ function showReview(review:Review) {
   if(review.financialAuthorizationAvailable===false){el('review').tabIndex=-1;el('review').scrollIntoView({block:'start'});el('review').focus({preventScroll:true});return;}
   if(review.state!=="REVIEW"&&review.state!=="SIGNATURES")return;
   if(!allowExecution)return; // No financial consent UI in read-only preparation.
-  if(review.state==="REVIEW") {
-    const label=document.createElement("label"),check=document.createElement("input");check.type="checkbox";label.append(check,document.createTextNode(m().consent));el("review").append(label);
-    const confirm=button("review",m().confirm,async()=>{
-      if(!check.checked)return;await walletMatches();
-      authorized=await api("confirm",{id:review.id,version:review.version});review.state="SIGNATURES";showReview(review);showSigning();
-    },true);confirm.disabled=true;check.onchange=()=>{confirm.disabled=!check.checked;};
-  }
+  showSigning();
   button("review",m().cancel,async()=>{await api("cancel",{id:review.id});clearAuthorization();active=undefined;el("review").replaceChildren();await status();});
 }
 async function walletMatches(checkQuote=true) {
   try {checkWallet(provider,wallet,checkQuote?active?.expiresAt:undefined);}
   catch(e){clearAuthorization();if(e instanceof WalletFlowError&&e.code==="NETWORK_MISMATCH")await invalidate();throw e;}
 }
-async function sign(data:unknown,kind:"PERMIT_REJECTED"|"INTENT_REJECTED") {
-  await walletMatches();const epoch=accountEpoch;
-  walletPending=true;
-  try {const value=await provider!.request({method:"eth_signTypedData_v4",params:[wallet,JSON.stringify(data)]});
-    if(epoch!==accountEpoch)throw new WalletFlowError("WALLET_REQUIRED");await walletMatches();return String(value);
-  } catch(e) {clearAuthorization();if(active){await api("cancel",{id:active.id}).catch(()=>undefined);active.state="CANCELLED";showReview(active);}await status().catch(()=>undefined);diagnostic(kind);throw e instanceof WalletFlowError?e:new WalletFlowError(kind);}
-  finally{walletPending=false;}
-}
-function showSigning() {
-  if(!authorized||!active)return;
-  const review=active,auth=authorized;
-  const permit=button("review",m().permit,async()=>{permitSignature=await sign(auth.permit,"PERMIT_REJECTED");permit.dataset.done="true";intent.disabled=false;});
-  const intent=button("review",m().intent,async()=>{intentSignature=await sign(auth.intent,"INTENT_REJECTED");intent.dataset.done="true";submit.disabled=false;});intent.disabled=true;
-  const submit=button("review",m().submit,async()=>{
-    await walletMatches();const ps=permitSignature,is=intentSignature;clearAuthorization();submit.dataset.done="true";
-    review.state="SUBMITTING";showReview(review);message(m().submitting);
-    // This POST is deliberately never retried, even if the HTTP response is lost.
-    try{showReview(await api("submit",{id:review.id,version:auth.version,signature:is,permitSignature:ps}));}
-    catch {review.state="UNKNOWN";showReview(review);message(m().unknown+" [SUBMISSION_UNKNOWN]");await status();}
-  },true);submit.disabled=true;
-}
+function showSigning(){if(!active||!allowExecution)return;financialPanel=tradeAuthorizationPanel({root:el('review'),review:active,language,api,provider:()=>provider,wallet:()=>wallet,epoch:()=>accountEpoch,enabled:()=>allowExecution,handoff:()=>financialHandoff(),pending:v=>{walletPending=v;},submitted:showReview,error:failure});}
 async function invalidate() {
   permitAcceptance?.invalidate();
   funding?.invalidate();accountEpoch++;wallet="";clearAuthorization();active=undefined;el("review").replaceChildren();
@@ -101,6 +76,7 @@ async function status(reconcile=false) {
   el("history").replaceChildren();for(const trade of result.trades as Review[]) {
     const p=document.createElement("pre");p.textContent=trade.text;el("history").append(p);
     if(trade.explorer&&/^https:\/\/sepolia\.etherscan\.io\/tx\/0x[0-9a-fA-F]{64}$/.test(trade.explorer)){const a=document.createElement("a");a.href=trade.explorer;a.textContent=m().explorer;a.target="_blank";a.rel="noopener noreferrer";el("history").append(a);}
+    if(allowExecution&&!active&&['REVIEW','SIGNATURES'].includes(trade.state)){active=trade;showReview(trade);}
     if(active?.id===trade.id&&!["REVIEW","SIGNATURES"].includes(trade.state)){clearAuthorization();showReview(trade);}
   }
 }
@@ -140,19 +116,21 @@ async function main() {
   contextHeading.textContent=language==='ko'?'새 Quote · Sepolia 테스트넷':'Fresh quote · Sepolia testnet';
   continuation=new TradeContinuation({api,id:route.id??c.startParam,invalid:route.invalid,changed:(context?:TradeContext)=>{
     quoteAction?.setContext(!!context);contextHeading.textContent=context?context.amount+' test '+context.fromSymbol+' → '+context.toSymbol+' · Sepolia':language==='ko'?'새 Quote · Sepolia 테스트넷':'Fresh quote · Sepolia testnet';
-    if(quoteAction)quoteAction.button.textContent=c.permitOnly&&isPermitContext(context)?(language==='ko'?'새 Quote · Permit 전용 검토':'Fresh quote · Permit-only review'):(language==='ko'?'내 지갑의 최신 Quote 확인':'Check my fresh wallet quote');
+    if(quoteAction)quoteAction.button.textContent=c.permitOnly&&isPermitContext(context)?(language==='ko'?'새 Quote · Permit 전용 검토':'Fresh quote · Permit-only review'):allowExecution?(language==='ko'?'새 Quote · 세 단계 교환 승인':'Fresh quote · three-step swap approval'):(language==='ko'?'내 지갑의 최신 Quote 확인':'Check my fresh wallet quote');
     if(context){const url=new URL(location.href);url.searchParams.set('intent',context.id);history.replaceState(null,'',url.pathname+url.search+url.hash);}
   }});
   quoteAction=quoteRequestButton({root:el('actions'),language,hasContext:()=>continuation?.valid()??false,renew:()=>picker.renewOwnership(),request:async()=>{
+    if(allowExecution&&active&&['REVIEW','SIGNATURES','EXPIRED'].includes(active.state))await api('cancel',{id:active.id});
     clearAuthorization();permitAcceptance?.invalidate();active=undefined;el('review').replaceChildren();
     assertWalletOrigin(c.origin,location.origin);
-    return requestContinuationReview({continuation:continuation!,permitOnly:c.permitOnly,preparePermit:permitAcceptance?.prepare,guard:()=>checkWallet(provider,wallet),epoch:()=>accountEpoch,showReadOnly:showReview});
+    return requestContinuationReview({continuation:continuation!,permitOnly:c.permitOnly,fullTrade:allowExecution,prepareTrade:async id=>{const epoch=accountEpoch;const review=await api('prepare',{intent:id});checkWallet(provider,wallet);if(epoch!==accountEpoch)throw new WalletFlowError('WALLET_REQUIRED');showReview(review);},preparePermit:permitAcceptance?.prepare,guard:()=>checkWallet(provider,wallet),epoch:()=>accountEpoch,showReadOnly:showReview});
   }});
   quoteAction.setContext(false);
   restoreContext=async()=>{try{await continuation!.restore();quoteAction!.status.textContent='';}catch(e){quoteAction!.status.textContent=quoteFailure(language,e);quoteAction!.setContext(false);}};
   void api('context/diagnostic',{stage:'BOOTSTRAP',hasRoute:!!(route.id??c.startParam)}).catch(()=>undefined);await restoreContext();
   const restart=document.createElement('a');restart.href='https://t.me/world_fx_alert_bot';restart.textContent=language==='ko'?'Telegram으로 돌아가기':'Return to Telegram';restart.target='_blank';restart.rel='noopener noreferrer';el('actions').append(restart);
   button('actions',language==='ko'?'이 거래 요청 취소':'Cancel this request',async()=>{await continuation!.cancel();permitAcceptance?.invalidate();clearAuthorization();active=undefined;el('review').replaceChildren();quoteAction!.status.textContent=quoteFailure(language,new WalletFlowError('TRADE_STATE'));});
+  financialHandoff=()=>picker.requestHandoff();
   if(c.permitOnly){
     const section=document.createElement('section');section.id='permit-acceptance';el('actions').after(section);
     permitAcceptance=permitPanel({root:section,language,api,provider:()=>provider,wallet:()=>wallet,epoch:()=>accountEpoch,
@@ -167,6 +145,6 @@ async function main() {
   button("wallet-tools",m().switchChain,async()=>{if(!provider?.session)throw new WalletFlowError("WALLET_REQUIRED");await invalidate();await switchSepolia(provider);message(m().network+" · "+m().connect);});
   button("wallet-tools",m().refresh,()=>status(true));await status();
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&walletPending){diagnostic("WALLET_RETURNED");}});
-  setInterval(()=>{if(continuation?.context&&!continuation.valid()){quoteAction?.setContext(false);quoteAction!.status.textContent=quoteFailure(language,new WalletFlowError('TRADE_STATE'));}if(active?.state==="PREVIEW"){const clock=document.getElementById("quote-clock");if(clock)clock.textContent=reviewClock(active.expiresAt,Date.now(),language).text;}if(active&&Date.now()>=active.expiresAt&&["PREVIEW","REVIEW","SIGNATURES"].includes(active.state)){clearAuthorization();active.state="EXPIRED";showReview(active);quoteAction?.expired();message(reviewClock(active.expiresAt,Date.now(),language).text);}},1000);
+  setInterval(()=>{if(continuation?.context&&!continuation.valid()){quoteAction?.setContext(false);quoteAction!.status.textContent=quoteFailure(language,new WalletFlowError('TRADE_STATE'));}if(active?.state==="PREVIEW"){const clock=document.getElementById("quote-clock");if(clock)clock.textContent=reviewClock(active.expiresAt,Date.now(),language).text;}if(active&&Date.now()>=active.expiresAt&&["PREVIEW","REVIEW"].includes(active.state)&&!allowExecution){clearAuthorization();active.state="EXPIRED";showReview(active);quoteAction?.expired();message(reviewClock(active.expiresAt,Date.now(),language).text);}},1000);
 }
 void main().catch(failure);

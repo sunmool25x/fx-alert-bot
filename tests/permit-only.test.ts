@@ -63,7 +63,7 @@ for(const field of ['spender','amount','wallet','chain','token','schema','deadli
   }finally{f.store.close();}
 });
 test('unexpected official spender and extreme costs stop even when other quote fields are valid',async()=>{
-  const f=await setup();try{f.api.liveConfig=async()=>deploymentFixture;await assert.rejects(f.prepare());f.api.liveConfig=async()=>({...deploymentFixture,sor_address:PERMIT_SPENDER});const original=f.api.getQuote;
+  const f=await setup();try{f.api.liveConfig=async()=>({...deploymentFixture,sor_address:'0x'+'4'.repeat(40)});await assert.rejects(f.prepare());f.api.liveConfig=async()=>({...deploymentFixture,sor_address:PERMIT_SPENDER});const original=f.api.getQuote;
     f.api.getQuote=async r=>{const q=await original(r) as ExecutionQuote;q.fee_breakdown={gas_cost_from_token:'30',gas_cost_usd:'30'};q.quote_breakdown!.gas_cost_usd='30';q.quote_breakdown!.gas_cost_input_token='30000000';return q;};
     await assert.rejects(f.prepare(),{code:'COST_REVIEW_BLOCKED'});assert.equal(f.store.permits.forWallet(signer.address),undefined);
   }finally{f.store.close();}

@@ -18,6 +18,7 @@ import {continuationLog} from '../wallet/continuation-log.js';
 import{PermitStore,migratePermits,migratePermitReconciliation,migratePermitEvidence,migratePermitRetirements}from'./permits.js';
 import{migrateInvalidPermitRetirement}from'./permit-domain-migration.js';
 
+import {AuthorizationStore} from './authorizations.js';
 export type Language = "ko" | "en";
 export interface User { id: string; language: Language; source: string | null; created_at: number; last_seen_at: number }
 export type Operation = "rate" | "quote" | "swap" | "liquidity" | "forget" | "alert";
@@ -31,6 +32,7 @@ export interface Flow {
 }
 export interface QuoteIntent { id: string; user_id: string; from_token: string; to_token: string; amount: string; expires_at: number; origin:string }
 export interface Store {
+  readonly authorizations:AuthorizationStore;
   readonly permits:PermitStore;
   readonly continuations:ContinuationStore;
   readonly analytics:AnalyticsStore;
@@ -51,6 +53,7 @@ export interface Store {
 }
 export const shortId = () => randomBytes(8).toString("base64url");
 export class SqliteStore implements Store {
+  readonly authorizations:AuthorizationStore;
   readonly permits:PermitStore;
   readonly continuations:ContinuationStore;
   readonly analytics:AnalyticsStore;
@@ -138,7 +141,7 @@ export class SqliteStore implements Store {
     if(existed&&!this.db.prepare('SELECT 1 FROM schema_migrations WHERE version=14').get()){
       const backup=path+'.before-phase7l-'+Date.now()+'-'+shortId()+'.sqlite';this.db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
     }
-    migrateInvalidPermitRetirement(this.db);this.permits=new PermitStore(this.db,now);
+    migrateInvalidPermitRetirement(this.db);this.permits=new PermitStore(this.db,now);this.authorizations=new AuthorizationStore(this.db,now);
   }
   async touch(id: string, source?: string): Promise<User> {
     if (!/^\d{1,20}$/.test(id)) throw new Error("Invalid user reference");

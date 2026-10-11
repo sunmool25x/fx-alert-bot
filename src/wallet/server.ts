@@ -91,7 +91,7 @@ export function signingServer(config:Config,store:Store,chain:ChainReads,trades:
         const start=new URLSearchParams(d.initData).get('start_param');continuationLog('BOOTSTRAP','OK',s.user_id);
         send(200,{language,userId:s.user_id,projectId:config.wallet.projectId,origin:config.wallet.origin,ready:config.wallet.ready,claimEnabled:claims.available(s.user_id),permitOnly:permits?.available(s.user_id)??false,enabled:config.wallet.enabled&&config.wallet.users.includes(s.user_id),startParam:start&&/^[A-Za-z0-9_-]{11}$/.test(start)?start:undefined});return;
       }
-      if(["/api/preview","/api/prepare","/api/challenge","/api/submit","/api/refresh","/api/diagnostic","/api/claim/prepare","/api/claim/confirm","/api/claim/refresh","/api/claim/report","/api/claim/preview"].includes(path)) {
+      if(["/api/authorization/request","/api/preview","/api/prepare","/api/challenge","/api/submit","/api/refresh","/api/diagnostic","/api/claim/prepare","/api/claim/confirm","/api/claim/refresh","/api/claim/report","/api/claim/preview"].includes(path)) {
         const k=s.user_id+path,b=limits.get(k);
         if(!b||now()-b.at>=60000)limits.set(k,{at:now(),count:1});else if(++b.count>6)throw new AppError("RATE_LIMITED");
       }
@@ -170,7 +170,15 @@ export function signingServer(config:Config,store:Store,chain:ChainReads,trades:
       }
       if(path==="/api/confirm") {const d=z.object({id,version:id}).strict().parse(data);send(200,trades.confirm(s,d.id,d.version));return;}
       if(path==="/api/cancel") {const d=z.object({id}).strict().parse(data);trades.cancel(s,d.id);send(200,{ok:true});return;}
-      if(path==="/api/submit") {const d=z.object({id,version:id,signature,permitSignature:signature}).strict().parse(data);send(200,tradeView(await trades.submit(s,d.id,d.version,d.signature as Hex,d.permitSignature as Hex),language));return;}
+      if(path==="/api/submit") {trades.gate(s.user_id);const d=z.object({id,version:id,consent:z.literal(true)}).strict().parse(data);send(200,tradeView(await trades.submit(s,d.id,d.version,d.consent),language));return;}
+      if(path.startsWith('/api/authorization/')){
+        const base={id,version:id},step=z.enum(['permit','intent']);
+        if(path==='/api/authorization/status'){const d=z.object(base).strict().parse(data);send(200,await trades.reconcileCaptured(s,d.id,d.version));return;}
+        if(path==='/api/authorization/request'){const d=z.object({...base,step,consent:z.literal(true)}).strict().parse(data);send(200,await trades.requestAuthorization(s,d.id,d.version,d.step,d.consent));return;}
+        if(path==='/api/authorization/record'){const d=z.object({...base,step,signature:z.string().max(264)}).strict().parse(data);send(200,await trades.recordAuthorization(s,d.id,d.version,d.step,d.signature));return;}
+        if(path==='/api/authorization/failure'){const d=z.object({...base,step,rejected:z.boolean()}).strict().parse(data);send(200,trades.authorizationFailure(s,d.id,d.version,d.step,d.rejected));return;}
+        if(path==='/api/authorization/observe'){const d=z.object({...base,step,kind:z.enum(['CLIENT_DISPATCHED','SDK_INVOKED','HANDOFF_REQUESTED','HANDOFF_REOPENED','CALLBACK_RECEIVED'])}).strict().parse(data);trades.authorizationObservation(s,d.id,d.version,d.step,d.kind);send(200,{ok:true});return;}
+      }
       throw new AppError("AUTH_INVALID");
     } catch(e) {const code=safeWalletCode(e instanceof ClaimError?e.code:e instanceof AppError?errorCode(e):"AUTH_INVALID");acceptanceLog(operation,code,userRef,walletRef);send(code==="RATE_LIMITED"?429:400,{code,message:walletFailure(language,code)});}
   };

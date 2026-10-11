@@ -2,7 +2,36 @@
 
 Start with [README: Start Live Testing](README.md#start-live-testing). Telegram mobile Mini App launch, official OKX Web3 handoff, connection and backend ownership verification have been successfully tested. MetaMask, Telegram Desktop, real swap submission and settlement remain unverified. Preserve existing private credentials. The launcher manages the tunnel/origin and rebuilds source changes on new launches. Mark a box only after **you perform that check**. Automated tests and public probes are recorded separately in [STATUS.md](STATUS.md); they do not complete phone tests.
 
-## Current gate — Phase 7M Permit verified; execution preparation only
+## Current gate — Phase 7O-PREP, mobile timing/protocol blocked
+
+- [x] Phase 7N implementation retained and revalidated; full suite 883/883 PASS, targeted history/retirement/timing/settlement 61/61 PASS.
+- [x] Two independent RPCs provide complete bounded Approval history with paced 50-block requests; original signature and zero current authority checks pass.
+- [x] Retirement dry run PASS only; valid historical Permit remains encrypted, `PERMIT_SIGNED`, expired and locked. No live migration or retirement.
+- [x] Three read-only timing probes distinguish network components from real wallet latency. No real Intent/submission timing claim.
+- [x] Persistent repository/global Git policy installed and instruction discovery verified. Publication includes Phase 7N and 7O-PREP public-safe work.
+- [x] Mainnet and swap execution OFF; no new live financial signature, submission or transaction.
+- [ ] Obtain an official Sera-supported practical mobile authorization window/workflow; current budget is insufficient for informed review.
+- [ ] Separately authorize fresh retirement evidence/application, reviewed migrations and narrowly scoped execution configuration.
+- [ ] In a future explicitly authorized task only: new ownership/Quote, separate Permit and Intent decisions, explicit single submission, independent finalized settlement verification.
+
+**One next owner action: send the prepared [Sera inquiry](PHASE7O_PREP.md#official-execution-requirements-and-alternatives) and obtain the supported workflow.** No new signature is requested. Historical checklists below are not current instructions.
+
+## Historical gate — Phase 7N offline ready; no live execution authorized
+
+- [x] Strict canonical Intent wire/digest and installed OKX serialization tested; current two-RPC on-chain getIntentDigest comparison matches.
+- [x] Durable encrypted Permit/Intent capture, late/unknown outcomes, common locks, immutable package, separate explicit actions and one submission attempt tested offline.
+- [x] Finalized two-RPC receipt/event/transfer/balance verification and reorg handling tested.
+- [x] Fake-clock timing admission tested; full suite 870/870 PASS, typecheck/build PASS.
+- [x] Signed-expired **valid** Permit retirement policy and migrations validated on disposable databases only. Live signed record/lock remain untouched.
+- [x] Mainnet, live swap execution, Intent and relayer remain OFF. No live financial request in Phase 7N.
+- [ ] Owner separately authorizes Phase 7O preparation after reviewing [PHASE7N.md](PHASE7N.md#verification-and-phase-7o-gate).
+- [ ] Fresh finalized authority evidence and separately authorized historical lock retirement; reviewed migrations/configuration with execution scope bounded.
+- [ ] Real mobile fresh package: Permit → Intent → one explicit submission within the original Quote's actual lifetime. **Not proven by fixtures.**
+- [ ] Independently verified finalized Sera settlement and final balances; no HTTP-only success claim.
+
+**Next owner action: review the Phase 7N report and decide whether to separately authorize Phase 7O preparation. Do not request another signature now.** The historical checkpoints below are evidence, not current instructions.
+
+## Historical gate — Phase 7M Permit verified; execution preparation only
 
 - [x] Owner completed one real mobile OKX Permit for exactly 50 test USDC → XSGD.
 - [x] Original signature independently recovered to the acceptance wallet; token, amount, spender, chain, nonce, domain and digest match. Encrypted callback and verified copy retained.

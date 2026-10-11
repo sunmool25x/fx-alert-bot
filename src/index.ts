@@ -27,7 +27,7 @@ async function main() {
   await client.preflight();
   const store = new SqliteStore(config.databasePath, config.conversationTtlMs);
   const market = new MarketService(client, config);
-  const chain=config.wallet.rpc?new SepoliaReads(config.wallet.rpc):undefined;
+  const chain=config.wallet.rpc?new SepoliaReads(config.wallet.rpc,new URL(config.wallet.rpc).hostname==='sepolia.drpc.org'?'https://ethereum-sepolia-rpc.publicnode.com':'https://sepolia.drpc.org'):undefined;
   const financialNotifications=new Api(config.botToken,{timeoutSeconds:10});
   const settlement=chain?new SettlementMonitor(store.wallet,chain,config.wallet.pollMs,async row=>{
     const user=await store.user(row.user_id);if(user){const view=tradeView(row,user.language),m=walletText[user.language];const keyboard=new InlineKeyboard().text(m.refresh,"wallet:status");if(view.explorer)keyboard.row().url(m.explorer,view.explorer);await financialNotifications.sendMessage(user.id,view.text,{reply_markup:keyboard});}

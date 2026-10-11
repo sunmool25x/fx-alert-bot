@@ -192,9 +192,9 @@ for (const language of ["ko", "en"] as const) {
       const snapshot = await f.service.preview(f.session, f.intent), before = JSON.stringify(snapshot);
       const preview = previewView(snapshot, language);
       assert.match(preview.text, language === "ko" ? /이 거래는 Sera Protocol을 통해 처리됩니다/ : /This trade is processed through Sera Protocol/);
-      assert.match(preview.text, language === "ko" ? /최소 수령액: 125 XSGD/ : /Minimum received: 125 XSGD/);
-      assert.match(preview.text, /1 USDC ≥ 1.25 XSGD/);
-      assert.match(preview.text, language === "ko" ? /최대 승인 금액: 100 USDC/ : /Maximum authorized input: 100 USDC/);
+      assert.match(preview.text, language === "ko" ? /최소 수령액: 60 XSGD/ : /Minimum received: 60 XSGD/);
+      assert.match(preview.text, /1 USDC ≥ 1.2 XSGD/);
+      assert.match(preview.text, language === "ko" ? /최대 승인 금액: 50 USDC/ : /Maximum authorized input: 50 USDC/);
       assert.equal(preview.text.split("\n\n")[1], stateText(language, "PREVIEW"));
       assert.equal(preview.version, null); assert.equal(preview.id, "");
       assert.equal(JSON.stringify(snapshot), before); assert.equal(f.store.wallet.list("1").length, 0);

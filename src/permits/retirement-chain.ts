@@ -5,7 +5,7 @@ import {AppError} from '../utils/errors.js';
 import type {AuthorityBlock,AuthorityObservation} from './retirement.js';
 import {proveExpiredPermitRuntime} from './expiry-proof.js';
 export interface ReadOnlyRpc{provider:string;call(method:string,params:unknown[]):Promise<unknown>}
-const methods=new Set(['eth_chainId','eth_getBlockByNumber','eth_getCode','eth_call','eth_getTransactionCount']);
+const methods=new Set(['eth_chainId','eth_getBlockByNumber','eth_getCode','eth_call','eth_getTransactionCount','eth_getLogs']);
 export function readOnlyRpc(url:string):ReadOnlyRpc{
   const parsed=new URL(url);if(parsed.protocol!=='https:')throw new AppError('PERMIT_LOCKED');let id=0;
   return{provider:parsed.hostname,async call(method,params){

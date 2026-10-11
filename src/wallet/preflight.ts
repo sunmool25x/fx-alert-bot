@@ -46,7 +46,12 @@ export function databaseReady(path: string): boolean {
   try {
     db = new DatabaseSync(path, { readOnly: true });
     const versions = db.prepare("SELECT version FROM schema_migrations ORDER BY version").all().map(r => r.version);
-    if (!["[1,2,3,4]","[1,2,3,4,6]","[1,2,3,4,6,7]","[1,2,3,4,6,7,8]","[1,2,3,4,6,7,8,9]","[1,2,3,4,6,7,8,9,10]","[1,2,3,4,6,7,8,9,10,11]","[1,2,3,4,6,7,8,9,10,11,12]","[1,2,3,4,6,7,8,9,10,11,12,13]","[1,2,3,4,6,7,8,9,10,11,12,13,14]"].includes(JSON.stringify(versions))) return false;
+    if (!["[1,2,3,4]","[1,2,3,4,6]","[1,2,3,4,6,7]","[1,2,3,4,6,7,8]","[1,2,3,4,6,7,8,9]","[1,2,3,4,6,7,8,9,10]","[1,2,3,4,6,7,8,9,10,11]","[1,2,3,4,6,7,8,9,10,11,12]","[1,2,3,4,6,7,8,9,10,11,12,13]","[1,2,3,4,6,7,8,9,10,11,12,13,14]","[1,2,3,4,6,7,8,9,10,11,12,13,14,15]","[1,2,3,4,6,7,8,9,10,11,12,13,14,16]","[1,2,3,4,6,7,8,9,10,11,12,13,14,15,16]"].includes(JSON.stringify(versions))) return false;
+    if(versions.includes(15)&&!String(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='permit_retirements'").get()?.sql).includes('EXPIRED_VALID_SIGNATURE_NO_ACTIVE_AUTHORITY'))return false;
+    if(versions.includes(16)){
+      for(const name of ['trade_packages','trade_authorizations','trade_authorization_events'])if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))return false;
+      for(const name of ['trade_package_immutable_update','trade_package_immutable_delete','trade_signature_retained','trade_signature_bound','trade_terms_bound','trade_events_retained_update','trade_events_retained_delete'])if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?").get(name))return false;
+    }
     if(versions.includes(13)){
       if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='permit_retirements'").get())return false;
       for(const name of ['permit_active_insert','permit_active_update','permit_retirement_binding','permit_retirement_no_update','permit_retirement_no_delete','permit_retired_insert','permit_retired_update','permit_retired_delete','permit_retired_event_insert'])
@@ -93,7 +98,7 @@ export async function preflight(env: NodeJS.ProcessEnv, options: { offline?: boo
   add(c.wallet.users.length === 1 ? "PASS" : "FAIL", "BETA_ALLOWLIST", c.wallet.users.length === 1 ? "Exactly one beta tester configured; confirm it is your /wallet ID" : "Acceptance requires exactly one EXECUTION_USER_IDS entry; obtain your ID from /wallet");
   add("PASS", "SESSION_SECRETS", "Sessions use generated random credentials stored as hashes; no static session/encryption key is used");
   const root = options.root ?? process.cwd();
-  add(databaseReady(c.databasePath) ? "PASS" : "FAIL", "DATABASE", "Database must have supported migrations through 14; start the bot with execution OFF to initialize/upgrade with backup");
+  add(databaseReady(c.databasePath) ? "PASS" : "FAIL", "DATABASE", "Database must have supported migrations through 14 plus optional 15/16; start the bot with execution OFF to initialize/upgrade with backup");
   add(["index.html", "app.js", "app.css", "THIRD_PARTY_LICENSES.txt"].every(f => existsSync(resolve(root, "dist/web", f))) ? "PASS" : "FAIL", "WEB_BUILD", "Signing frontend and license build; run npm run build if missing");
   add(c.wallet.origin ? "PASS" : "FAIL", "TELEGRAM_LAUNCH", "Inline private-chat Web App URL derives from SIGNING_ORIGIN; /newapp and Login Widget /setdomain are not required");
   add("WARN", "REOWN_ALLOWLIST", options.development?"Dedicated development Reown project: documented empty allowlist permits changing tunnel origins; actual relay access remains untested":"For stable hosting allow the exact origin; dev:live supports a dedicated development project with Reown's documented empty allowlist");

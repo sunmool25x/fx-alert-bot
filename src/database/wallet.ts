@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { randomBytes, createHash } from "node:crypto";
 import { AppError } from "../utils/errors.js";
+import {assertFinancialAvailable,authorizationSchemaReady} from './financial-locks.js';
 export const secret = () => randomBytes(32).toString("hex");
 export const digest = (v: string) => createHash("sha256").update(v).digest("hex");
 export type TradeState = "DRAFT" | "REVIEW" | "SIGNATURES" | "SUBMITTING" | "PENDING" | "CONFIRMED" | "FAILED" | "EXPIRED" | "CANCELLED" | "UNKNOWN" | "UNKNOWN_REORG";
@@ -69,20 +70,24 @@ export class WalletStore {
     this.db.prepare("UPDATE wallet_sessions SET wallet=? WHERE id=? AND expires_at>?").run(address,session.id,this.now());
   }
   address(user: string) { return this.db.prepare("SELECT address FROM wallet_links WHERE user_id=?").get(user)?.address as string | undefined; }
+  private unsignedFilter(){return authorizationSchemaReady(this.db)?" AND NOT EXISTS(SELECT 1 FROM trade_packages p WHERE p.trade_id=trade_sessions.id)":'';}
+  private unrequestedFilter(){return authorizationSchemaReady(this.db)?" AND NOT EXISTS(SELECT 1 FROM trade_authorizations a WHERE a.trade_id=trade_sessions.id)":'';}
   disconnect(user: string) {
     this.db.prepare("DELETE FROM wallet_links WHERE user_id=?").run(user);
     this.db.prepare("UPDATE wallet_sessions SET wallet=NULL,epoch=epoch+1 WHERE user_id=?").run(user);
     this.db.prepare("DELETE FROM wallet_challenges WHERE session_id IN (SELECT id FROM wallet_sessions WHERE user_id=?)").run(user);
-    this.db.prepare("UPDATE trade_sessions SET state='CANCELLED',version=NULL WHERE user_id=? AND state IN ('DRAFT','REVIEW','SIGNATURES')").run(user);
+    if(authorizationSchemaReady(this.db))this.db.prepare("UPDATE trade_sessions SET state='CANCELLED' WHERE user_id=? AND state IN ('DRAFT','REVIEW','SIGNATURES')"+this.unrequestedFilter()).run(user);
+    this.db.prepare("UPDATE trade_sessions SET state='CANCELLED',version=NULL WHERE user_id=? AND state IN ('DRAFT','REVIEW','SIGNATURES')"+this.unsignedFilter()).run(user);
   }
-  expire() { this.db.prepare("UPDATE trade_sessions SET state='EXPIRED',version=NULL WHERE expires_at<=? AND state IN ('DRAFT','REVIEW','SIGNATURES')").run(this.now()); }
+  expire() { if(authorizationSchemaReady(this.db))this.db.prepare("UPDATE trade_sessions SET state='EXPIRED' WHERE expires_at<=? AND state IN ('DRAFT','REVIEW','SIGNATURES')"+this.unrequestedFilter()).run(this.now()); this.db.prepare("UPDATE trade_sessions SET state='EXPIRED',version=NULL WHERE expires_at<=? AND state IN ('DRAFT','REVIEW','SIGNATURES')"+this.unsignedFilter()).run(this.now()); }
   draft(s: Session, intent: string, origin: string) {
     this.expire(); if (!s.wallet) throw new AppError("WALLET_REQUIRED");
     if(this.quarantined(s.wallet))throw new AppError("WALLET_BUSY");
     const id = secret();
-    try { this.db.prepare(`INSERT INTO trade_sessions(id,user_id,session_id,wallet,chain_id,origin,intent_id,state,expires_at,created_at)
-      VALUES(?,?,?,?,11155111,?,?,'DRAFT',?,?)`).run(id,s.user_id,s.id,s.wallet,origin,intent,this.now()+120000,this.now()); }
-    catch { throw new AppError("WALLET_BUSY"); } return this.trade(id,s.user_id)!;
+    this.db.exec('BEGIN IMMEDIATE');
+    try { assertFinancialAvailable(this.db,s.user_id,s.wallet);this.db.prepare(`INSERT INTO trade_sessions(id,user_id,session_id,wallet,chain_id,origin,intent_id,state,expires_at,created_at)
+      VALUES(?,?,?,?,11155111,?,?,'DRAFT',?,?)`).run(id,s.user_id,s.id,s.wallet,origin,intent,this.now()+120000,this.now());this.db.exec('COMMIT'); }
+    catch(e) {this.db.exec('ROLLBACK');if(e instanceof AppError)throw e;throw new AppError("WALLET_BUSY"); } return this.trade(id,s.user_id)!;
   }
   trade(id: string, user: string) { this.expire(); return this.db.prepare("SELECT * FROM trade_sessions WHERE id=? AND user_id=?").get(id,user) as unknown as TradeRow | undefined; }
   transition(id: string, from: TradeState[], state: TradeState, fields: Partial<TradeRow> = {}) {
@@ -95,18 +100,29 @@ export class WalletStore {
   attempt(row: TradeRow, block: string) {
     this.db.exec("BEGIN IMMEDIATE");
     try {
+      const current=this.db.prepare('SELECT * FROM trade_sessions WHERE id=?').get(row.id) as unknown as TradeRow;
+      if(!current||current.version!==row.version||current.state!=='SIGNATURES'||current.expires_at<=this.now()+3000)throw new AppError('QUOTE_STALE');
+      assertFinancialAvailable(this.db,row.user_id,row.wallet,row.id);
+      if(authorizationSchemaReady(this.db)&&this.db.prepare('SELECT 1 FROM trade_packages WHERE trade_id=?').get(row.id)&&this.db.prepare("SELECT count(*) n FROM trade_authorizations WHERE trade_id=? AND version=? AND state='SIGNED' AND crypto_valid=1").get(row.id,row.version!)?.n!==2)throw new AppError('TRADE_STATE');
       if (!this.transition(row.id,["SIGNATURES"],"SUBMITTING",{submitted_at:this.now(),start_block:block,cursor_block:block})) throw new AppError("TRADE_STATE");
       this.db.prepare("INSERT INTO trade_attempts VALUES(?,?)").run(row.id,this.now()); this.db.exec("COMMIT");
       this.observed();
     } catch(e) {this.db.exec("ROLLBACK");throw e;}
   }
-  recover() { this.db.prepare("UPDATE trade_sessions SET state='UNKNOWN',error_code='RESTART_DURING_SUBMIT' WHERE state='SUBMITTING'").run(); }
+  recover() {
+    if(authorizationSchemaReady(this.db)){
+      this.db.exec('BEGIN IMMEDIATE');try{
+        this.db.prepare("INSERT INTO trade_authorization_events(trade_id,version,kind,at) SELECT trade_id,version,upper(step)||'_RESTART_UNKNOWN',? FROM trade_authorizations WHERE state='REQUESTING'").run(this.now());
+        this.db.prepare("UPDATE trade_authorizations SET state='RESULT_UNKNOWN',code='RESTART_RESULT_UNKNOWN' WHERE state='REQUESTING'").run();this.db.exec('COMMIT');
+      }catch(e){this.db.exec('ROLLBACK');throw e;}
+    }
+    this.db.prepare("UPDATE trade_sessions SET state='UNKNOWN',error_code='RESTART_DURING_SUBMIT' WHERE state='SUBMITTING'").run(); }
   quarantined(address:string) {return !!this.db.prepare("SELECT 1 FROM wallet_quarantine WHERE address=?").get(address);}
   reorg(row:TradeRow) {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.db.prepare("INSERT OR IGNORE INTO wallet_quarantine VALUES(?,'FINALIZED_REORG',?)").run(row.wallet,this.now());
-      this.db.prepare("UPDATE trade_sessions SET state='CANCELLED',version=NULL WHERE wallet=? AND state IN ('DRAFT','REVIEW','SIGNATURES')").run(row.wallet);
+      this.db.prepare("UPDATE trade_sessions SET state='CANCELLED',version=NULL WHERE wallet=? AND state IN ('DRAFT','REVIEW','SIGNATURES')"+this.unsignedFilter()).run(row.wallet);
       // Keep any later submitted swap. Quarantine blocks all new actions for this wallet.
       this.db.prepare("UPDATE trade_sessions SET state='UNKNOWN_REORG',cursor_block=start_block,error_code='FINALIZED_REORG',notified=0,next_check=? WHERE id=?").run(this.now(),row.id);
       this.db.exec("COMMIT");
@@ -116,6 +132,7 @@ export class WalletStore {
   list(user: string) { this.expire(); return this.db.prepare("SELECT * FROM trade_sessions WHERE user_id=? ORDER BY created_at DESC LIMIT 5").all(user) as unknown as TradeRow[]; }
   forget(user: string) {
     if(this.db.prepare("SELECT 1 FROM trade_sessions WHERE user_id=? AND state IN ('SUBMITTING','PENDING','UNKNOWN','UNKNOWN_REORG')").get(user)) throw new AppError("WALLET_BUSY");
+    if(authorizationSchemaReady(this.db)&&this.db.prepare('SELECT 1 FROM trade_packages WHERE user_id=?').get(user))throw new AppError('WALLET_BUSY');
     this.disconnect(user); this.db.prepare("DELETE FROM trade_sessions WHERE user_id=?").run(user);
   }
 }

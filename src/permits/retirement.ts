@@ -22,8 +22,12 @@ export function validateExpiredPermitRetirement(r:PermitRow,e:ExpiredPermitEvide
 }
 /** Shared authority gates; signature classifications have separate strict reconciliation paths. */
 export function validateRetirementAuthority(r:PermitRow,e:Omit<ExpiredPermitEvidence,'classification'|'signatureResult'>,now:number){
-  must(e.schema===1);
   must(['RESULT_UNKNOWN','PERMIT_INVALID'].includes(r.state)&&r.closed_at===null&&r.requested_at!==null&&r.signed_at===null&&!r.encrypted_signature);
+  validateAuthorityEvidence(r,e,now);
+}
+/** Authority evidence only. Callers must separately prove the exact signature classification. */
+export function validateAuthorityEvidence(r:PermitRow,e:Omit<ExpiredPermitEvidence,'classification'|'signatureResult'>,now:number){
+  must(e.schema===1);
   must(e.requestId===r.id&&e.version===r.version&&e.digest===r.digest&&e.historicalHash===historicalPermitHash(r));
   must(/^[a-f0-9]{64}$/.test(e.codeVersion)&&e.expiryProof===EXPIRY_PROOF);
   // Local clock limits observation age only; financial expiry is established by finalized chain time below.

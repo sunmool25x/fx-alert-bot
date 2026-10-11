@@ -22,6 +22,10 @@ Telegram: [@world_fx_alert_bot](https://t.me/world_fx_alert_bot) · Repository: 
 **Execution is OFF.** The Sepolia trade architecture exists, but actual submission and settlement are not yet live verified.
 Mainnet is rejected. This is an experimental MVP, not an audited trading release.
 
+[Phase 7N](PHASE7N.md) completes offline validation of strict Intent signing, encrypted authorization state, shared locks, one explicit submission and finalized settlement checks. Historical Permit evidence stays locked; no live retirement or execution was enabled. Reliable two-signature mobile completion inside the short Quote window remains unproven.
+
+[Phase 7O-PREP](PHASE7O_PREP.md) resolves the historical RPC evidence blocker in a dry run, preserves the signed lock, and measures the short Quote window. **Mobile timing/protocol remains blocked**: current safety checks leave insufficient review time. A technical inquiry for Sera is prepared; no new signature or swap is requested. [AGENTS.md](AGENTS.md) records the owner's persistent safe commit/push policy for future development tasks.
+
 ## Current status
 
 **First real OKX Permit signing verified on Sepolia; Intent signing and swap settlement remain pending.**

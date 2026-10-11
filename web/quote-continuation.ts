@@ -25,8 +25,9 @@ export class TradeContinuation {
 }
 export const isPermitContext=(c:TradeContext|undefined)=>!!c&&c.amount==='50'&&c.fromSymbol==='USDC'&&c.toSymbol==='XSGD'&&c.chainId===11155111;
 /** The shared fresh-quote CTA selects a capability, never promotes an existing preview. */
-export async function requestContinuationReview(o:{continuation:TradeContinuation;permitOnly:boolean;preparePermit?:(id:string)=>Promise<void>;guard:()=>void;epoch:()=>number;showReadOnly:(review:any)=>void}){
+export async function requestContinuationReview(o:{continuation:TradeContinuation;permitOnly:boolean;fullTrade?:boolean;prepareTrade?:(id:string)=>Promise<void>;preparePermit?:(id:string)=>Promise<void>;guard:()=>void;epoch:()=>number;showReadOnly:(review:any)=>void}){
   const c=await o.continuation.restore();o.guard();
+  if(o.fullTrade){if(o.permitOnly||!isPermitContext(c)||!o.prepareTrade)throw new WalletFlowError('EXECUTION_DISABLED');const epoch=o.epoch();await o.prepareTrade(c.id);o.guard();if(epoch!==o.epoch())throw new WalletFlowError('WALLET_REQUIRED');return 'trade' as const;}
   if(o.permitOnly&&isPermitContext(c)){
     if(!o.preparePermit)throw new WalletFlowError('PERMIT_DISABLED');
     await o.preparePermit(c.id);return 'permit' as const;
@@ -58,7 +59,7 @@ export async function freshContinuationQuote(o:{id?:string;api:WalletApi;guard:(
   return review;
 }
 /** Visible status is in the active request panel, including failures from claim CTA. */
-export function quoteRequestButton(o:{root:HTMLElement;language:'ko'|'en';request:()=>Promise<void|'permit'|'read-only'>;renew:()=>Promise<void>;hasContext?:()=>boolean}){
+export function quoteRequestButton(o:{root:HTMLElement;language:'ko'|'en';request:()=>Promise<void|'permit'|'read-only'|'trade'>;renew:()=>Promise<void>;hasContext?:()=>boolean}){
   const status=document.createElement('p');status.setAttribute('role','status');status.setAttribute('aria-live','polite');status.tabIndex=-1;
   const button=document.createElement('button');button.type='button';button.className='primary';button.textContent=o.language==='ko'?'내 지갑의 최신 Quote 확인':'Check my fresh wallet quote';
   const renew=document.createElement('button');renew.type='button';renew.textContent=o.language==='ko'?'지갑 소유 확인':'Verify wallet ownership';renew.hidden=true;
@@ -68,7 +69,7 @@ export function quoteRequestButton(o:{root:HTMLElement;language:'ko'|'en';reques
     if(o.hasContext&&!o.hasContext()){status.textContent=quoteFailure(o.language,new WalletFlowError('TRADE_STATE'));button.disabled=true;reveal();return;}
     if(working){status.textContent=o.language==='ko'?'Quote를 조회 중입니다…':'Fetching quote…';reveal();return;}
     working=true;button.disabled=true;renew.hidden=true;status.textContent=o.language==='ko'?'현재 요청으로 최신 Quote를 조회 중입니다…':'Fetching a fresh quote for this request…';reveal();
-    try{const mode=await o.request();status.textContent=mode==='permit'?(o.language==='ko'?'새 Quote의 Permit 전용 검토 화면입니다. 아직 서명을 요청하지 않았습니다. Intent와 제출은 비활성 상태입니다.':'Fresh quote Permit-only review is ready. No signature has been requested. Intent and submission are disabled.'):(o.language==='ko'?'새 Quote 검토 화면을 표시했습니다. 서명과 제출은 비활성 상태입니다.':'Fresh quote review displayed. Signing and submission are disabled.');}
+    try{const mode=await o.request();status.textContent=mode==='trade'?(o.language==='ko'?'새 Quote를 확인하고 USDC 사용 승인 → 이번 교환 승인 → 거래 제출을 각각 선택합니다.':'Review the fresh quote, then separately authorize USDC, authorize the swap, and submit once.'):mode==='permit'?(o.language==='ko'?'새 Quote의 Permit 전용 검토 화면입니다. 아직 서명을 요청하지 않았습니다. Intent와 제출은 비활성 상태입니다.':'Fresh quote Permit-only review is ready. No signature has been requested. Intent and submission are disabled.'):(o.language==='ko'?'새 Quote 검토 화면을 표시했습니다. 서명과 제출은 비활성 상태입니다.':'Fresh quote review displayed. Signing and submission are disabled.');}
     catch(e){status.textContent=quoteFailure(o.language,e);renew.hidden=quoteErrorCode(e)!=='OWNERSHIP_EXPIRED';reveal();}
     finally{working=false;button.disabled=o.hasContext?!o.hasContext():false;}
   }

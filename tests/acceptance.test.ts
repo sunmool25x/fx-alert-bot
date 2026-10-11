@@ -21,8 +21,8 @@ test("preview rejects another user's intent and a disconnected wallet",async()=>
 });
 test("owner-scoped status refresh respects backoff and never resubmits UNKNOWN trades",async()=>{
   const f=await fixture();try{
-    const row=await f.prepare();f.service.confirm(f.session,row.id,row.version!);const sig=await f.signatures(row);let attempts=0,reads=0;
-    f.sender.submit=async()=>{attempts++;throw new AppError("UNAVAILABLE");};await f.service.submit(f.session,row.id,row.version!,sig.signature,sig.permitSignature);
+    const row=await f.prepare();f.service.confirm(f.session,row.id,row.version!);const sig=await f.authorize(row);let attempts=0,reads=0;
+    f.sender.submit=async()=>{attempts++;throw new AppError("UNAVAILABLE");};await f.service.submit(f.session,row.id,row.version!,true);
     f.chain.settle=async(_d,_q,_h,cursor)=>{reads++;return {next:cursor+1n};};const worker=new SettlementMonitor(f.store.wallet,f.chain,60000,async()=>{},f.now);
     await worker.refresh("2");assert.equal(reads,0);await Promise.all([worker.refresh("1"),worker.refresh("1"),worker.cycle()]);assert.equal(reads,1);
     await worker.refresh("1");assert.equal(reads,1);f.advance(300000);await worker.refresh("1");assert.equal(reads,2);assert.equal(attempts,1);assert.equal(f.store.wallet.trade(row.id,"1")!.state,"UNKNOWN");

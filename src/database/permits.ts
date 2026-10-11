@@ -2,9 +2,11 @@ import type{DatabaseSync}from'node:sqlite';import{secret}from'./wallet.js';impor
 import{validateNoSignatureClosure,type NoSignatureEvidence}from'../permits/reconciliation.js';
 import{validateExpiredPermitRetirement,historicalPermitHash,type ExpiredPermitEvidence}from'../permits/retirement.js';
 import{inspectEmptyDomainResult,validateInvalidRetirement,capturedResultHash,type CapturedPermitResult,type InvalidPermitEvidence}from'../permits/invalid-reconciliation.js';
+import {assertFinancialAvailable} from './financial-locks.js';
+import {inspectSignedPermit,validateValidRetirement,type ValidRetirementEvidence} from '../permits/valid-retirement.js';
 export type PermitState='REVIEW'|'PERMIT_REQUESTED'|'PERMIT_SIGNED'|'USER_REJECTED'|'WALLET_ERROR'|'PERMIT_INVALID'|'RESULT_UNKNOWN'|'WALLET_ERROR_NO_SIGNATURE';
 export interface PermitRow{id:string;user_id:string;wallet:string;session_id:string;epoch:number;intent_id:string;version:string;payload:string;digest:string;created_at:number;requested_at:number|null;signed_at:number|null;state:PermitState;encrypted_signature:string|null;error_code:string|null;rpc_code:number|null;closed_at:number|null;reconciliation:string|null}
-export interface PermitRetirementRow{permit_id:string;version:string;digest:string;classification:'EXPIRED_RESULT_UNKNOWN_NO_ACTIVE_AUTHORITY'|'EXPIRED_INVALID_SIGNATURE_NO_ACTIVE_AUTHORITY';evidence:string;retired_at:number}
+export interface PermitRetirementRow{permit_id:string;version:string;digest:string;classification:'EXPIRED_RESULT_UNKNOWN_NO_ACTIVE_AUTHORITY'|'EXPIRED_INVALID_SIGNATURE_NO_ACTIVE_AUTHORITY'|'EXPIRED_VALID_SIGNATURE_NO_ACTIVE_AUTHORITY';evidence:string;retired_at:number}
 export function migratePermits(db:DatabaseSync){if(db.prepare('SELECT 1 FROM schema_migrations WHERE version=10').get())return;
   db.exec(`BEGIN IMMEDIATE;CREATE TABLE permit_acceptance(
     id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,wallet TEXT NOT NULL UNIQUE,
@@ -35,6 +37,7 @@ export class PermitStore{
   forWallet(wallet:string){return this.db.prepare('SELECT p.* FROM permit_acceptance p LEFT JOIN permit_retirements r ON r.permit_id=p.id AND r.version=p.version WHERE lower(p.wallet)=? ORDER BY (p.closed_at IS NULL AND r.permit_id IS NULL) DESC,p.created_at DESC,p.rowid DESC LIMIT 1').get(wallet.toLowerCase()) as unknown as PermitRow|undefined;}
   /** Read-only, exhaustive inspection. Never use wallet.list(), which expires rows and limits history. */
   financialPending(row:PermitRow){
+    try{assertFinancialAvailable(this.db,row.user_id,row.wallet,'',row.id);}catch{return true;}
     if(this.db.prepare('SELECT 1 FROM wallet_quarantine WHERE lower(address)=lower(?)').get(row.wallet))return true;
     if(this.db.prepare(`SELECT 1 FROM permit_acceptance p WHERE (p.user_id=? OR lower(p.wallet)=lower(?)) AND p.id!=? AND p.closed_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM permit_retirements r WHERE r.permit_id=p.id AND r.version=p.version) LIMIT 1`).get(row.user_id,row.wallet,row.id))return true;
@@ -70,6 +73,21 @@ export class PermitStore{
       this.event(current,'RETIRED_EXPIRED_INVALID');const retired=this.retirement(current)!;this.db.exec('COMMIT');return retired;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
+  /** Separate opt-in operator path. Never invoked by the bot, server, refresh or startup. */
+  async retireExpiredValid(row:PermitRow,e:ValidRetirementEvidence,key:string){
+    const result=this.db.prepare('SELECT * FROM permit_results WHERE permit_id=? AND version=?').get(row.id,row.version) as CapturedPermitResult|undefined;
+    if(!result)throw new AppError('PERMIT_LOCKED');
+    const checked=await inspectSignedPermit(row,result,key);if(checked.resultHash!==e.resultHash)throw new AppError('PERMIT_LOCKED');
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const current=this.row(row.id,row.user_id),latest=this.db.prepare('SELECT * FROM permit_results WHERE permit_id=? AND version=?').get(row.id,row.version) as CapturedPermitResult|undefined;
+      if(!current||!latest||historicalPermitHash(current)!==e.historicalHash||capturedResultHash(latest)!==e.resultHash)throw new AppError('PERMIT_LOCKED');
+      const existing=this.retirement(current);if(existing){if(existing.classification!==e.classification||existing.evidence!==JSON.stringify(e))throw new AppError('PERMIT_LOCKED');this.db.exec('COMMIT');return existing;}
+      if(this.financialPending(current))throw new AppError('PERMIT_LOCKED');
+      assertFinancialAvailable(this.db,current.user_id,current.wallet,'',current.id);validateValidRetirement(current,e,this.now());
+      this.db.prepare('INSERT INTO permit_retirements VALUES(?,?,?,?,?,?)').run(current.id,current.version,current.digest,e.classification,JSON.stringify(e),this.now());
+      this.event(current,'RETIRED_EXPIRED_VALID');const retired=this.retirement(current)!;this.db.exec('COMMIT');return retired;
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
   canRetry(row:PermitRow,session:{id:string;epoch:number;user_id:string},intent:string){
     const retired=this.retirement(row),releasedAt=retired?.retired_at??(row.state==='WALLET_ERROR_NO_SIGNATURE'?row.closed_at:null);
     if(releasedAt===null||row.user_id!==session.user_id||intent===row.intent_id||session.id===row.session_id&&session.epoch===row.epoch)return false;
@@ -78,7 +96,7 @@ export class PermitStore{
   }
   events(row:PermitRow){return this.db.prepare('SELECT kind,at FROM permit_events WHERE permit_id=? AND version=? ORDER BY id').all(row.id,row.version) as{kind:string;at:number}[];}
   event(row:PermitRow,kind:PermitEvent){
-    if(!['RETIRED_EXPIRED_UNKNOWN','RETIRED_EXPIRED_INVALID'].includes(kind))this.active(row);
+    if(!['RETIRED_EXPIRED_UNKNOWN','RETIRED_EXPIRED_INVALID','RETIRED_EXPIRED_VALID'].includes(kind))this.active(row);
     this.db.prepare('INSERT INTO permit_events(permit_id,version,kind,at) VALUES(?,?,?,?)').run(row.id,row.version,kind,this.now());
   }
   closeNoSignature(row:PermitRow,evidence:NoSignatureEvidence){this.db.exec('BEGIN IMMEDIATE');try{
@@ -90,6 +108,7 @@ export class PermitStore{
     const wallet=value.wallet.toLowerCase();this.db.exec('BEGIN IMMEDIATE');try{
       const latest=this.forWallet(wallet),old=latest?.closed_at===null&&!this.retirement(latest)?latest:undefined;if(old&&(old.user_id!==value.user_id||old.state!=='REVIEW'||old.requested_at!==null))throw new AppError('PERMIT_LOCKED');
       if(latest&&!old&&(!this.canRetry(latest,{id:value.session_id,epoch:value.epoch,user_id:value.user_id},value.intent_id)||value.version===latest.version))throw new AppError('PERMIT_LOCKED');
+      assertFinancialAvailable(this.db,value.user_id,wallet,'',old?.id??'');
       const id=old?.id??secret();
       this.db.prepare(`INSERT INTO permit_acceptance(id,user_id,wallet,session_id,epoch,intent_id,version,payload,digest,created_at,state) VALUES(?,?,?,?,?,?,?,?,?,?,'REVIEW')
         ON CONFLICT(id) DO UPDATE SET session_id=excluded.session_id,epoch=excluded.epoch,intent_id=excluded.intent_id,version=excluded.version,payload=excluded.payload,digest=excluded.digest,created_at=excluded.created_at`).run(id,value.user_id,wallet,value.session_id,value.epoch,value.intent_id,value.version,value.payload,value.digest,this.now());
@@ -112,7 +131,7 @@ export class PermitStore{
   }
   resultChecked(r:PermitRow,valid:boolean|null,code:string,chain:string){this.active(r);this.db.prepare('UPDATE permit_results SET crypto_valid=?,validation_code=?,chain_status=? WHERE permit_id=? AND version=?').run(valid===null?null:valid?1:0,code,chain,r.id,r.version);}
 }
-export type PermitEvent='REVIEW_PREPARED'|'CONSENT_AND_CLICK'|'PREFLIGHT_STARTED'|'PREFLIGHT_PASS'|'PREFLIGHT_QUOTE_STALE'|'PREFLIGHT_OWNERSHIP_EXPIRED'|'PREFLIGHT_BLOCKED'|'REQUEST_RESERVED'|'RPC_DISPATCHED'|'SDK_INVOKED'|'SDK_RETURNED'|'HANDOFF_REQUESTED'|'HANDOFF_FAILED'|'HANDOFF_REOPENED'|'CALLBACK_RECEIVED'|'RESPONSE_RECEIVED'|'SIGNATURE_RECEIVED'|'SIGNED'|'FAILED'|'CLOSED_NO_SIGNATURE'|'CLIENT_QUOTE_STALE'|'CLIENT_OWNERSHIP_EXPIRED'|'RETIRED_EXPIRED_UNKNOWN'|'RETIRED_EXPIRED_INVALID'|'CLIENT_PRE_DISPATCH_REJECTED'|`PRE_DISPATCH_REJECTED:${string}:${string}`|`SIGNATURE_INVALID:${string}`;
+export type PermitEvent='REVIEW_PREPARED'|'CONSENT_AND_CLICK'|'PREFLIGHT_STARTED'|'PREFLIGHT_PASS'|'PREFLIGHT_QUOTE_STALE'|'PREFLIGHT_OWNERSHIP_EXPIRED'|'PREFLIGHT_BLOCKED'|'REQUEST_RESERVED'|'RPC_DISPATCHED'|'SDK_INVOKED'|'SDK_RETURNED'|'HANDOFF_REQUESTED'|'HANDOFF_FAILED'|'HANDOFF_REOPENED'|'CALLBACK_RECEIVED'|'RESPONSE_RECEIVED'|'SIGNATURE_RECEIVED'|'SIGNED'|'FAILED'|'CLOSED_NO_SIGNATURE'|'CLIENT_QUOTE_STALE'|'CLIENT_OWNERSHIP_EXPIRED'|'RETIRED_EXPIRED_UNKNOWN'|'RETIRED_EXPIRED_INVALID'|'RETIRED_EXPIRED_VALID'|'CLIENT_PRE_DISPATCH_REJECTED'|`PRE_DISPATCH_REJECTED:${string}:${string}`|`SIGNATURE_INVALID:${string}`;
 export function migratePermitEvidence(db:DatabaseSync){if(db.prepare('SELECT 1 FROM schema_migrations WHERE version=12').get())return;
   db.exec(`BEGIN IMMEDIATE;
     CREATE TABLE permit_reviews(permit_id TEXT NOT NULL REFERENCES permit_acceptance(id) ON DELETE CASCADE,version TEXT NOT NULL,payload TEXT NOT NULL,digest TEXT NOT NULL,prepared_at INTEGER NOT NULL,PRIMARY KEY(permit_id,version));

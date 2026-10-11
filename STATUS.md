@@ -1,6 +1,26 @@
 # Implementation status
 
-## Current — Phase 7M real mobile Permit VERIFIED; execution remains blocked, 2026-10-11 KST
+## Current — Phase 7O-PREP: mobile timing/protocol blocked; execution OFF
+
+Classification **C — MOBILE_TIMING_OR_PROTOCOL_BLOCKED**. [PHASE7O_PREP.md](PHASE7O_PREP.md) records complete independent historical Approval evidence, a passing valid-expired Permit retirement dry run and measured read-only Quote timing. The original `PERMIT_SIGNED` ciphertext and lock remain untouched; no live retirement or financial migration was applied. dRPC accepts 50-block history queries but rejects 500/1,000-block queries with a misleading free-plan range message. Retirement and settlement catch-up now use bounded 50-block queries without weakening evidence requirements.
+
+Three diagnostic quotes had 29.219–29.351 seconds left after preparation. Mandatory Permit preflight leaves only 95–196 ms before the current conservative admission threshold, without user reading or mobile transport. Real Permit signing previously took 12.221 seconds; real Intent and submission timing remain unmeasured. Full mobile completion is not proven. The prepared Sera inquiry asks for a supported usable quote-validity workflow and has not been sent.
+
+Full suite **883/883 PASS**, zero skipped; targeted **61/61 PASS**. Typecheck/build PASS. Audit: 3 moderate, zero high/critical, no available fixes reported; dependencies unchanged. Mainnet/swap execution remain OFF. No new live Permit/Intent, relayer submission or transaction. The 13 financial/history tables, encrypted evidence, schema 14, environment and runtime origin are preserved; integrity ok, zero FK errors. Repository and global Git policies are installed and their discovery verified using the installed Codex CLI. Publication scope includes all 43 Phase 7N files plus this safe preparation; no private evidence is included.
+
+**Next owner action: send the technical inquiry in PHASE7O_PREP.md to Sera and obtain its supported mobile workflow.** Do not initiate another signature. The checkpoints below describe historical phases, not current authorization.
+
+Gitleaks/publication scans PASS across 252 public files and Git history; exact configured-secret and retained-signature/ciphertext scans find no publication matches. The 47-file publication set includes Phase 7N plus Phase 7O-PREP and the repository Git policy. Publication does not authorize live execution.
+
+## Historical — Phase 7N offline authorization/settlement ready; live execution OFF
+
+Classification **A — OFFLINE_READY_FOR_CONTROLLED_LIVE_ACCEPTANCE**. The existing TradeService now has strict Intent wire/domain validation, encrypted durable Permit/Intent callbacks, one immutable package, common financial locks, separate explicit approvals and single-submission protection. Two-RPC finalized event/transfer/balance verification and deterministic Quote timing gates are covered offline. See [PHASE7N.md](PHASE7N.md) for protocol evidence, migration/retirement policy, timing assumptions and Phase 7O prerequisites.
+
+The historical valid Permit remains PERMIT_SIGNED, expired, encrypted and locked. No live retirement or financial migration, new financial request, Intent, relayer POST or transaction occurred. Private environment, funding/financial history and launcher safety gates are preserved. Mainnet and execution remain OFF. Live mobile Permit + Intent + submission within the short Quote TTL is **not proven**; classification A is offline readiness only.
+
+Full tests: **870/870 PASS**, zero skipped; targeted tests **130/130 PASS**. Typecheck/build PASS. Audit: 3 moderate, 0 high/critical, no fix reported; no dependency changes. Disposable migration copy: 28 original tables unchanged, integrity ok, zero FK errors. Gitleaks: zero leaks across 248 public files and four commits. Publication/configured-secret and financial-signature scans pass; all 13 live financial/wallet/history tables, secret environment and runtime origin match the baseline. HTTP health/page checks pass with execution OFF. No commit/push; Phase 7O is not started.
+
+## Historical — Phase 7M real mobile Permit VERIFIED; execution remains blocked, 2026-10-11 KST
 
 The first successful owner-approved OKX ERC-2612 Permit is independently **VERIFIED** from its original encrypted callback and persisted signature. Canonical recovery, original digest, exact 50-USDC amount, token, owner, spender, Sepolia domain and nonce all match. Both ciphertext copies are authenticated and retained. The quote expired at 04:17:14 UTC and Permit/unsigned Intent at 04:21:43 UTC. The row remains `PERMIT_SIGNED`; its lock and complete history are preserved, with no retirement or reuse. See [PHASE7M.md](PHASE7M.md).
 

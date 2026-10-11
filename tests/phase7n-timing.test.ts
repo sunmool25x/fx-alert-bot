@@ -1,0 +1,16 @@
+import test from'node:test';import assert from'node:assert/strict';
+import{admit,remainingBudget,timingBudget}from'../src/trades/timing.js';import{fixture,signer}from'./trade-helpers.js';import{permitData}from'../src/trades/contract.js';
+const start=1800000000000,quote=start+30000,deadline=start+300000,ownership=start+900000;
+test('deterministic budget reserves both explicit financial steps plus submission and five-second margin',()=>{assert.equal(timingBudget.permit,12221);assert.equal(remainingBudget('permit'),28221);assert.equal(remainingBudget('intent'),16000);assert.equal(remainingBudget('submit'),8000);});
+for(const scenario of [
+ {name:'fast',review:500,permit:5000,intent:4000,submit:2000,pass:true},
+ {name:'12.221 second Permit baseline',review:500,permit:12221,intent:8000,submit:3000,pass:true},
+ {name:'normal deliberate reading',review:4000,permit:12221,intent:8000,submit:3000,pass:false},
+ {name:'slow wallet handoff',review:500,permit:16000,intent:8000,submit:3000,pass:false},
+ {name:'delayed Permit callback',review:500,permit:31000,intent:8000,submit:3000,pass:false},
+ {name:'slow Intent',review:500,permit:12221,intent:11000,submit:3000,pass:false},
+ {name:'delayed Intent callback',review:500,permit:5000,intent:30000,submit:3000,pass:false},
+])test('30-second simulation: '+scenario.name,()=>{let now=start+scenario.review;const run=()=>{admit('permit',now,quote,deadline,deadline,ownership);now+=scenario.permit;admit('intent',now,quote,deadline,deadline,ownership);now+=scenario.intent;admit('submit',now,quote,deadline,deadline,ownership);now+=scenario.submit;assert(now<=quote-5000);};if(scenario.pass)run();else assert.throws(run);});
+test('long Permit deadline cannot extend Quote; ownership expiry is an independent gate',()=>{assert.throws(()=>admit('submit',quote,quote,deadline,deadline,ownership));assert.throws(()=>admit('intent',start,quote,deadline,deadline,start+15000),{code:'AUTH_STALE'});});
+for(const boundary of ['before','during'])test('expiry '+boundary+' server preflight reserves zero wallet requests',async()=>{const f=await fixture();try{const row=await f.prepare();f.service.confirm(f.session,row.id,row.version!);if(boundary==='before')f.advance(30000);else f.chain.permit=async()=>{f.advance(30000);};await assert.rejects(f.service.requestAuthorization(f.session,row.id,row.version!,'permit',true));assert.equal(f.store.authorizations.row(row.id,'permit'),undefined);assert.equal(f.submitted(),0);}finally{f.store.close();}});
+test('ownership renewal invalidates financial continuation but preserves original callback evidence',async()=>{const f=await fixture();try{const row=await f.prepare();f.service.confirm(f.session,row.id,row.version!);await f.service.requestAuthorization(f.session,row.id,row.version!,'permit',true);f.store.wallet.link(f.session,signer.address.toLowerCase());const current=f.store.wallet.session(f.token)!;const p=f.service.snapshot(row);await f.service.recordAuthorization(current,row.id,row.version!,'permit',await signer.signTypedData(permitData(p.quote)));await assert.rejects(f.service.requestAuthorization(current,row.id,row.version!,'intent',true));assert.equal(f.store.authorizations.row(row.id,'permit')?.state,'SIGNED');assert.equal(f.submitted(),0);}finally{f.store.close();}});

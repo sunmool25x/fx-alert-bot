@@ -93,6 +93,6 @@ test('ownership renewal reuses connected provider and requires another explicit 
   assert.equal(starts,1);assert.equal(prepares,2);assert.equal(verifies,1);assert.equal(invalidates,before);assert.equal(flow.screen.step,'ownership');await flow.verify();assert.equal(verifies,2);
 });
 test('active app preserves continuation and delegates the shared Quote action to the tested capability router',()=>{
-  const app=readFileSync('web/app.ts','utf8'),claim=readFileSync('web/claim-panel.ts','utf8');assert(app.includes("url.searchParams.set('intent',context.id)"));assert(app.includes('return requestContinuationReview({continuation:continuation!,permitOnly:c.permitOnly,preparePermit:permitAcceptance?.prepare'));assert(!claim.includes('requestTwoUsdcPreview'));
+  const app=readFileSync('web/app.ts','utf8'),claim=readFileSync('web/claim-panel.ts','utf8');assert(app.includes("url.searchParams.set('intent',context.id)"));assert(app.includes('return requestContinuationReview({continuation:continuation!,permitOnly:c.permitOnly,fullTrade:allowExecution'));assert(app.includes('preparePermit:permitAcceptance?.prepare'));assert(app.includes("api('prepare',{intent:id})"));assert(!claim.includes('requestTwoUsdcPreview'));
   assert.equal(claimCopy.ko.preview,'새 Quote 확인');assert.equal(claimCopy.en.preview,'Check a new quote');
 });
